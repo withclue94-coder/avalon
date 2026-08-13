@@ -2026,7 +2026,22 @@
         // ============================================================
         // 模块 4：工具函数
         // ============================================================
-        function showToast(msg, duration = 2500) { toast.textContent = msg; toast.classList.add('show'); clearTimeout(toast._timer); toast._timer = setTimeout(() => toast.classList.remove('show'), duration); }
+        // 独立的定时器变量，不污染 DOM
+        let toastTimer = null;
+
+        function showToast(msg, duration = 2500) {
+            toast.textContent = msg;
+            toast.classList.add('show');
+            // 清除旧定时器
+            if (toastTimer) {
+                clearTimeout(toastTimer);
+                toastTimer = null;
+            }
+            toastTimer = setTimeout(() => {
+                toast.classList.remove('show');
+                toastTimer = null;
+            }, duration);
+        }
         function setStatus(el, msg, type) { el.textContent = msg; el.className = 'status-msg ' + type; }
         function clearStatus(el) { el.className = 'status-msg'; el.textContent = ''; }
         function generateRoomId() { const c = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'; let r = ''; for (let i = 0; i < 6; i++) r += c.charAt(Math.floor(Math.random() * c.length)); return r; }
@@ -2708,68 +2723,65 @@
                 if (modifyBtn) modifyBtn.style.display = 'none';
             }
             lobbyRoomInfo.textContent = '房间: ' + STATE.roomId + ' · ' + playerIds.length + ' 人';
-            // 在 lobbyRoomInfo 下方添加规则展示
+
+            // ============================================================
+            // 在 lobbyRoomInfo 下方添加规则展示（优化版）
+            // ============================================================
             const ruleDisplay = document.getElementById('lobbyRuleDisplay');
             if (ruleDisplay) {
                 if (STATE.rule) {
                     const count = STATE.rule.playerCount || 5;
                     const roles = STATE.rule.roles || [];
-                    ruleDisplay.innerHTML = `
-    <div
-        class="room-rule-info"
-        style="
-            display:flex;
-            justify-content:space-between;
-            align-items:center;
-            flex-wrap:wrap;
-            gap:10px;
-        "
-    >
-        <!-- 当前房间人数和角色 -->
-        <span style="flex:1;min-width:220px;">
-            <strong>👥 ${count} 人</strong>
-            · 🎭 角色：${roles.join('、')}
-        </span>
-        <!-- 按钮区域 -->
-        <div
-            style="
-                display:flex;
-                gap:6px;
-                flex-wrap:wrap;
-            "
-        >
-            <!-- 身份说明 -->
-            <button
-                class="btn btn-xs btn-secondary"
-                id="showRoleInfoBtn"
-                style="
-                    padding:4px 14px;
-                    background:#2a4a6a;
-                    border:1px solid #3a5a7a;
-                "
-            >
-                📖 身份说明
-            </button>
-            <!-- 游戏规则 -->
-            <button
-                class="btn btn-xs btn-secondary"
-                id="showGameRuleBtn"
-                style="
-                    padding:4px 14px;
-                    background:#2a4a6a;
-                    border:1px solid #3a5a7a;
-                "
-            >
-                📜 游戏规则
-            </button>
-        </div>
-    </div>
-`;
-                    ruleDisplay.style.display = 'block';
 
-                    // 绑定按钮事件（注意使用事件委托或一次性绑定）
-                    document.getElementById('showRoleInfoBtn')?.addEventListener('click', showRoleInfo);
-                    document.getElementById('showGameRuleBtn')?.addEventListener('click', showGameRule);
+                    // 查找是否已存在规则容器
+                    let existingContainer = ruleDisplay.querySelector('.room-rule-info');
+
+                    if (existingContainer) {
+                        // ----- 已存在容器：只更新内容，不重建 -----
+                        const span = existingContainer.querySelector('span');
+                        if (span) {
+                            span.innerHTML = `<strong>👥 ${count} 人</strong> · 🎭 角色：${roles.join('、')}`;
+                        }
+
+                        // 检查按钮是否存在，如果缺失则补建（防止意外删除）
+                        const btnGroup = existingContainer.querySelector('div[style*="display:flex;gap:6px;"]') || existingContainer;
+                        if (!existingContainer.querySelector('#showRoleInfoBtn')) {
+                            const roleBtn = document.createElement('button');
+                            roleBtn.className = 'btn btn-xs btn-secondary';
+                            roleBtn.id = 'showRoleInfoBtn';
+                            roleBtn.style.cssText = 'padding:4px 14px; background:#2a4a6a; border:1px solid #3a5a7a;';
+                            roleBtn.textContent = '📖 身份说明';
+                            roleBtn.addEventListener('click', showRoleInfo);
+                            btnGroup.appendChild(roleBtn);
+                        }
+                        if (!existingContainer.querySelector('#showGameRuleBtn')) {
+                            const ruleBtn = document.createElement('button');
+                            ruleBtn.className = 'btn btn-xs btn-secondary';
+                            ruleBtn.id = 'showGameRuleBtn';
+                            ruleBtn.style.cssText = 'padding:4px 14px; background:#2a4a6a; border:1px solid #3a5a7a;';
+                            ruleBtn.textContent = '📜 游戏规则';
+                            ruleBtn.addEventListener('click', showGameRule);
+                            btnGroup.appendChild(ruleBtn);
+                        }
+                    } else {
+                        // ----- 首次创建 -----
+                        ruleDisplay.innerHTML = `
+                    <div class="room-rule-info" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+                        <span style="flex:1;min-width:220px;">
+                            <strong>👥 ${count} 人</strong> · 🎭 角色：${roles.join('、')}
+                        </span>
+                        <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                            <button class="btn btn-xs btn-secondary" id="showRoleInfoBtn" style="padding:4px 14px; background:#2a4a6a; border:1px solid #3a5a7a;">📖 身份说明</button>
+                            <button class="btn btn-xs btn-secondary" id="showGameRuleBtn" style="padding:4px 14px; background:#2a4a6a; border:1px solid #3a5a7a;">📜 游戏规则</button>
+                        </div>
+                    </div>
+                `;
+                        // 绑定按钮事件
+                        document.getElementById('showRoleInfoBtn')?.addEventListener('click', showRoleInfo);
+                        document.getElementById('showGameRuleBtn')?.addEventListener('click', showGameRule);
+                    }
+
+                    ruleDisplay.style.display = 'block';
                 } else {
                     ruleDisplay.style.display = 'none';
                 }
@@ -3491,446 +3503,110 @@
             showToast(`已选中 ${targetPlayer.name}，请确认刺杀`, 1500);
         };
 
-        // ----- 管理员一键任务成功 -----
-        // ----- 管理员一键任务成功 -----
-        window.adminQuickMissionSuccess = function () {
-
+        // ============================================================
+        // 管理员设置任务结果（一键成功 / 一键失败）
+        // success: true 表示任务成功，false 表示任务失败
+        // ============================================================
+        function adminSetMissionResult(success) {
             if (!STATE.roomId) {
-
-                showToast(
-                    '请先创建房间',
-                    1500
-                );
-
+                showToast('请先创建房间', 1500);
                 return;
             }
 
             if (!STATE.isAdmin) {
-
-                showToast(
-                    '只有管理员可以使用此功能',
-                    1500
-                );
-
+                showToast('只有管理员可以使用此功能', 1500);
                 return;
             }
 
             if (STATE.phase !== 'day_mission') {
-
-                showToast(
-                    '当前不在任务阶段',
-                    1500
-                );
-
+                showToast('当前不在任务阶段', 1500);
                 return;
             }
 
-            if (
-                STATE.missionPhase !== 'selecting' &&
-                STATE.missionPhase !== 'voting'
-            ) {
-
-                showToast(
-                    '当前不在组队或投票阶段',
-                    1500
-                );
-
+            if (STATE.missionPhase !== 'selecting' && STATE.missionPhase !== 'voting') {
+                showToast('当前不在组队或投票阶段', 1500);
                 return;
             }
 
-            const config =
-                getMissionConfig(
-                    STATE.missionRound
-                );
-
+            const config = getMissionConfig(STATE.missionRound);
             if (!config) {
-
-                showToast(
-                    '任务配置错误',
-                    1500
-                );
-
+                showToast('任务配置错误', 1500);
                 return;
             }
 
-            const allPlayerIds =
-                Object.keys(
-                    STATE.allPlayers
-                );
-
-            if (
-                allPlayerIds.length <
-                config.players
-            ) {
-
-                showToast(
-                    `玩家不足，需要 ${config.players} 人`,
-                    1500
-                );
-
+            const allPlayerIds = Object.keys(STATE.allPlayers);
+            if (allPlayerIds.length < config.players) {
+                showToast(`玩家不足，需要 ${config.players} 人`, 1500);
                 return;
             }
 
-            // ============================================================
-            // 随机选择任务队伍
-            // ============================================================
+            // 构建队伍
+            const shuffledPlayers = shuffleArray([...allPlayerIds]);
 
-            const shuffledPlayers =
-                shuffleArray(
-                    [...allPlayerIds]
-                );
+            // 如果是一键成功，直接用前 config.players 个玩家
+            // 如果是一键失败，优先把坏人放进去
+            let team;
+            if (success) {
+                team = shuffledPlayers.slice(0, config.players);
+            } else {
+                const badRoles = ['莫甘娜', '刺客', '莫德雷德', '奥伯伦', '爪牙'];
+                const badPlayers = allPlayerIds.filter(uid => badRoles.includes(STATE.allPlayers[uid]?.role));
+                const goodPlayers = allPlayerIds.filter(uid => !badRoles.includes(STATE.allPlayers[uid]?.role));
+                const shuffledBad = shuffleArray([...badPlayers]);
+                const shuffledGood = shuffleArray([...goodPlayers]);
+                const candidateOrder = [...shuffledBad, ...shuffledGood];
+                team = candidateOrder.slice(0, config.players);
+                if (team.length !== config.players) {
+                    showToast('无法生成完整测试队伍', 1500);
+                    return;
+                }
+            }
 
-            const team =
-                shuffledPlayers.slice(
-                    0,
-                    config.players
-                );
-
-            // ============================================================
-            // 所有队员任务牌 = 成功
-            // ============================================================
-
+            // 创建任务牌
             const taskResults = {};
+            if (success) {
+                // 全部成功
+                team.forEach(uid => { taskResults[uid] = '成功'; });
+            } else {
+                // 保证达到失败条件所需的失败张数
+                const requiredFailCount = Math.min(config.fail, team.length);
+                team.forEach(uid => { taskResults[uid] = '成功'; });
+                for (let i = 0; i < requiredFailCount; i++) {
+                    taskResults[team[i]] = '失败';
+                }
+            }
 
-            team.forEach(uid => {
-
-                taskResults[uid] =
-                    '成功';
-
-            });
-
-            // ============================================================
             // 写入 Firebase
-            //
-            // 不能只修改本地 STATE。
-            // 因为 finalizeMissionResult() 会从 Firebase
-            // 重新读取最新任务状态。
-            // ============================================================
-
-            const roomRef =
-                db.ref(
-                    'rooms/' +
-                    STATE.roomId
-                );
-
+            const roomRef = db.ref('rooms/' + STATE.roomId);
             roomRef.update({
+                missionPhase: 'executing',
+                missionTeam: team,
+                missionTaskResults: taskResults,
+                missionResult: null,
+                missionFinalized: false,
+                missionFinalizing: null
+            }).then(() => {
+                STATE.missionTeam = team;
+                STATE.missionTaskResults = taskResults;
+                STATE.missionPhase = 'executing';
+                STATE.missionResult = null;
+                STATE.missionFinalized = false;
+                STATE._resultShown = false;
+                finalizeMissionResult(null);
+            }).catch(err => {
+                console.error('管理员设置任务结果失败:', err);
+                showToast('操作失败: ' + err.message, 2000);
+            });
+        }
 
-                missionPhase:
-                    'executing',
-
-                missionTeam:
-                    team,
-
-                missionTaskResults:
-                    taskResults,
-
-                missionResult:
-                    null,
-
-                missionFinalized:
-                    false,
-
-                missionFinalizing:
-                    null
-
-            })
-                .then(() => {
-
-                    // 同步本地状态
-                    STATE.missionTeam =
-                        team;
-
-                    STATE.missionTaskResults =
-                        taskResults;
-
-                    STATE.missionPhase =
-                        'executing';
-
-                    STATE.missionResult =
-                        null;
-
-                    STATE.missionFinalized =
-                        false;
-
-                    STATE._resultShown =
-                        false;
-
-                    // 让正常结算逻辑根据 Firebase 任务牌自动计算
-                    finalizeMissionResult(null);
-
-                })
-                .catch(err => {
-
-                    console.error(
-                        '管理员一键成功失败:',
-                        err
-                    );
-
-                    showToast(
-                        '操作失败: ' +
-                        err.message,
-                        2000
-                    );
-
-                });
+        // ----- 管理员一键任务成功 -----
+        window.adminQuickMissionSuccess = function () {
+            adminSetMissionResult(true);
         };
 
         // ----- 管理员一键任务失败 -----
-        // ----- 管理员一键任务失败 -----
         window.adminQuickMissionFail = function () {
-
-            if (!STATE.roomId) {
-
-                showToast(
-                    '请先创建房间',
-                    1500
-                );
-
-                return;
-            }
-
-            if (!STATE.isAdmin) {
-
-                showToast(
-                    '只有管理员可以使用此功能',
-                    1500
-                );
-
-                return;
-            }
-
-            if (STATE.phase !== 'day_mission') {
-
-                showToast(
-                    '当前不在任务阶段',
-                    1500
-                );
-
-                return;
-            }
-
-            if (
-                STATE.missionPhase !== 'selecting' &&
-                STATE.missionPhase !== 'voting'
-            ) {
-
-                showToast(
-                    '当前不在组队或投票阶段',
-                    1500
-                );
-
-                return;
-            }
-
-            const config =
-                getMissionConfig(
-                    STATE.missionRound
-                );
-
-            if (!config) {
-
-                showToast(
-                    '任务配置错误',
-                    1500
-                );
-
-                return;
-            }
-
-            const allPlayerIds =
-                Object.keys(
-                    STATE.allPlayers
-                );
-
-            if (
-                allPlayerIds.length <
-                config.players
-            ) {
-
-                showToast(
-                    `玩家不足，需要 ${config.players} 人`,
-                    1500
-                );
-
-                return;
-            }
-
-            // ============================================================
-            // 随机选择任务队伍
-            //
-            // 优先把坏人放进队伍，让测试结果更像真实对局。
-            // ============================================================
-
-            const badRoles = [
-                '莫甘娜',
-                '刺客',
-                '莫德雷德',
-                '奥伯伦',
-                '爪牙'
-            ];
-
-            const badPlayers =
-                allPlayerIds.filter(uid => {
-
-                    return badRoles.includes(
-                        STATE.allPlayers[uid]?.role
-                    );
-
-                });
-
-            const shuffledBadPlayers =
-                shuffleArray(
-                    [...badPlayers]
-                );
-
-            const shuffledGoodPlayers =
-                shuffleArray(
-                    allPlayerIds.filter(uid => {
-
-                        return !badRoles.includes(
-                            STATE.allPlayers[uid]?.role
-                        );
-
-                    })
-                );
-
-            // ============================================================
-            // 先把坏人放前面，再补足队伍
-            // ============================================================
-
-            const candidateOrder =
-                [
-                    ...shuffledBadPlayers,
-                    ...shuffledGoodPlayers
-                ];
-
-            const team =
-                candidateOrder.slice(
-                    0,
-                    config.players
-                );
-
-            if (
-                team.length !==
-                config.players
-            ) {
-
-                showToast(
-                    '无法生成完整测试队伍',
-                    1500
-                );
-
-                return;
-            }
-
-            // ============================================================
-            // 创建任务牌
-            //
-            // 为了保证“管理员一键失败”真的一定失败，
-            // 直接生成达到当前任务失败条件所需的 Fail 张数。
-            //
-            // 这是管理员测试功能，不代表真实玩家可以这么操作。
-            // ============================================================
-
-            const taskResults = {};
-
-            const requiredFailCount =
-                Math.min(
-                    config.fail,
-                    team.length
-                );
-
-            // 先准备队伍
-            team.forEach(uid => {
-
-                taskResults[uid] =
-                    '成功';
-
-            });
-
-            // 把前几个队员设置为失败
-            for (
-                let i = 0;
-                i < requiredFailCount;
-                i++
-            ) {
-
-                taskResults[
-                    team[i]
-                ] = '失败';
-
-            }
-
-            // ============================================================
-            // 写入 Firebase
-            // ============================================================
-
-            const roomRef =
-                db.ref(
-                    'rooms/' +
-                    STATE.roomId
-                );
-
-            roomRef.update({
-
-                missionPhase:
-                    'executing',
-
-                missionTeam:
-                    team,
-
-                missionTaskResults:
-                    taskResults,
-
-                missionResult:
-                    null,
-
-                missionFinalized:
-                    false,
-
-                missionFinalizing:
-                    null
-
-            })
-                .then(() => {
-
-                    // 同步本地
-                    STATE.missionTeam =
-                        team;
-
-                    STATE.missionTaskResults =
-                        taskResults;
-
-                    STATE.missionPhase =
-                        'executing';
-
-                    STATE.missionResult =
-                        null;
-
-                    STATE.missionFinalized =
-                        false;
-
-                    STATE._resultShown =
-                        false;
-
-                    // 让系统按照真实任务牌结算
-                    finalizeMissionResult(null);
-
-                })
-                .catch(err => {
-
-                    console.error(
-                        '管理员一键失败失败:',
-                        err
-                    );
-
-                    showToast(
-                        '操作失败: ' +
-                        err.message,
-                        2000
-                    );
-
-                });
+            adminSetMissionResult(false);
         };
 
         // ----- 管理员一键赞成 -----
@@ -4706,47 +4382,33 @@
 
             try {
 
-                claimResult =
-                    await roomRef
-                        .child('missionAdvanceClaim')
-                        .transaction(currentValue => {
+                claimResult = await roomRef
+                    .child('missionAdvanceClaim')
+                    .transaction(currentValue => {
+                        // ------------------------------------------------
+                        // 已经有人认领当前轮
+                        // ------------------------------------------------
+                        if (currentValue && currentValue.round === currentRound) {
+                            return;
+                        }
+                        // ------------------------------------------------
+                        // 当前客户端认领当前轮
+                        // ------------------------------------------------
 
-                            // ------------------------------------------------
-                            // 已经有人认领当前轮
-                            // ------------------------------------------------
+                        return {
+                            round:
+                                currentRound,
 
-                            if (
-                                currentValue &&
-                                currentValue.round === currentRound
-                            ) {
+                            uid:
+                                STATE.uid ||
+                                STATE.myUid ||
+                                null,
 
-                                return;
-                            } if (
-                                currentValue &&
-                                currentValue.round === currentRound
-                            ) {
+                            time:
+                                Date.now()
+                        };
 
-                                return;
-                            }
-
-                            // ------------------------------------------------
-                            // 当前客户端认领当前轮
-                            // ------------------------------------------------
-
-                            return {
-                                round:
-                                    currentRound,
-
-                                uid:
-                                    STATE.uid ||
-                                    STATE.myUid ||
-                                    null,
-
-                                time:
-                                    Date.now()
-                            };
-
-                        });
+                    });
 
             } catch (err) {
 
@@ -5058,13 +4720,8 @@
 
             // 清除上一个本地计时器
             if (missionAdvanceTimer) {
-
-                clearTimeout(
-                    missionAdvanceTimer
-                );
-
-                missionAdvanceTimer =
-                    null;
+                clearTimeout(missionAdvanceTimer);
+                missionAdvanceTimer = null;
             }
 
             if (!STATE.roomId) {
@@ -5095,9 +4752,9 @@
 
                     missionAdvanceTimer =
                         null;
-
-                    tryAdvanceMissionRound();
-
+                    if (STATE.missionFinalized && STATE.missionResult !== null) {
+                        tryAdvanceMissionRound();
+                    }
                 }, waitTime);
         }
 

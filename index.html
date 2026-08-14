@@ -4992,8 +4992,10 @@
             STATE.missionLeaderIndex =
                 nextLeaderIndex;
 
-            STATE.oberonTarget =
-                null;
+	// 奥伯伦技能属于整局状态，进入下一轮不能清除
+	    STATE.oberonTarget =
+    		latestData.oberonTarget ||
+    			null;
 
             // ============================================================
             // 11. 获取下一轮车长名称

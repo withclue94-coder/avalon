@@ -5268,18 +5268,7 @@
                 <button class="btn btn-sm btn-secondary" onclick="updateChoice('${effectiveUid}','${changeVal}')" style="padding:10px 24px;font-size:16px;">切换为${changeText}</button>
             </div>`;
                 }
-                html += '<div style="margin-top:14px;font-size:14px;color:#667788;text-align:center;">其他玩家状态：';
-                playerIds.forEach(uid => {
-                    if (uid === effectiveUid) return;
-                    const p = allPlayers[uid];
-                    const choice = electChoice[uid];
-                    let status = '⏳ 未选';
-                    if (choice === 'campaign') status = '🗳️ 竞选';
-                    else if (choice === 'withdrawn') status = '🚫 退选';
-                    html += `${escapeHtml(p.name)} ${status}　`;
-                });
-                html += '</div></div>';
-
+                html += '</div>';
                 candidatesDiv.innerHTML = html;
                 votesDiv.innerHTML = '';
                 actionDiv.innerHTML = '';
@@ -5630,8 +5619,8 @@ ${STATE.proposalRejectCount >= 4
                 // 始终显示发车顺序
                 const order = STATE.missionOrder || [];
                 const direction = STATE.missionDirection === 'clockwise' ? '顺时针（升序）' : '逆时针（降序）';
-                let orderHtml = `<div style="font-size:15px;color:#8899aa;margin-bottom:8px;">当前发车顺序（${direction}）：</div>`;
-                orderHtml += `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">`;
+                let orderHtml = `<div id="missionOrderDisplay" style="font-size:15px;color:#8899aa;margin-bottom:8px;">当前发车顺序（${direction}）：</div>`;
+                orderHtml += `<div id="missionOrderList" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">`;
                 order.forEach((uid) => {
                     const p = allPlayers[uid];
                     const num = STATE.playerNumbers[uid] || '?';
@@ -5664,6 +5653,28 @@ ${STATE.proposalRejectCount >= 4
                                 mark.textContent = isSelected ? '✅' : '';
                             }
                         });
+
+                        // ✅ 新增：更新发车顺序显示
+                        const orderDisplay = document.getElementById('missionOrderDisplay');
+                        const orderList = document.getElementById('missionOrderList');
+                        if (orderDisplay && orderList) {
+                            const direction = STATE.missionDirection === 'clockwise' ? '顺时针（升序）' : '逆时针（降序）';
+                            orderDisplay.textContent = `当前发车顺序（${direction}）：`;
+                            const order = STATE.missionOrder || [];
+                            const allPlayers = STATE.allPlayers;
+                            const currentLeaderUid = STATE.missionOrder && STATE.missionOrder.length > 0 ? STATE.missionOrder[STATE.missionLeaderIndex] : null;
+                            let newHtml = '';
+                            order.forEach((uid) => {
+                                const p = allPlayers[uid];
+                                const num = STATE.playerNumbers[uid] || '?';
+                                const isLeader2 = (uid === currentLeaderUid);
+                                newHtml += `<span style="background:#0f1a30;padding:4px 12px;border-radius:16px;border:${isLeader2 ? '2px solid #f0a500' : '1px solid #2a3a5a'};">
+                #${num} ${escapeHtml(p.name)}${isLeader2 ? ' 👑' : ''}
+            </span>`;
+                            });
+                            orderList.innerHTML = newHtml;
+                        }
+
                         // 更新进度信息
                         const progressSpan = document.querySelector('#teamProgress .team-count');
                         if (progressSpan) {
@@ -5986,50 +5997,36 @@ ${STATE.proposalRejectCount >= 4
                     // 所有人已提交，准备结算
                     // ========================================================
 
-                    // 带 disabled 逻辑的按钮代码 防御按钮完全不可见
-                    const isDisabled = !allSubmitted || STATE.missionFinalized;
-                    const btnHtml = `
-                    <button class="btn btn-success" id="manualFinalizeBtn" 
-                    style="padding:12px 32px;font-size:18px;" 
-                    ${isDisabled ? 'disabled' : ''}>
-                    ⚡ 结算任务
-                    </button>
-                    `;
-
-                    const currentLeaderUid =
-                        STATE.missionOrder && STATE.missionOrder.length > 0
-                            ? STATE.missionOrder[STATE.missionLeaderIndex]
-                            : null;
-                    const isCurrentLeader = STATE.myUid === currentLeaderUid;
+                    const currentLeaderUid = STATE.missionOrder && STATE.missionOrder.length > 0 ? STATE.missionOrder[STATE.missionLeaderIndex] : null;
+                    const isCurrentLeader = effectiveUid === currentLeaderUid;  // ✅ 使用 effectiveUid
 
                     // 显示队员列表
                     const teamHtml =
                         `<div style="font-size:15px;">
-                            执行任务的玩家：
-                            ${teamMembers.map(uid =>
+            执行任务的玩家：
+            ${teamMembers.map(uid =>
                             escapeHtml(allPlayers[uid]?.name || '未知')
                         ).join('、')}
-                        </div>`;
+        </div>`;
                     team.innerHTML = teamHtml;
 
-                    // 显示票数统计（已提交的结果）
-                    const successCount = Object.values(taskResults).filter(v => v === '成功').length;
-                    const failCount = Object.values(taskResults).filter(v => v === '失败').length;
-                    votes.innerHTML = `
-                        <div style="font-size:16px;color:#8899aa;">
-                            成功票：<span style="color:#6fcf97;font-weight:bold;">${successCount}</span> ／
-                            失败票：<span style="color:#ff6b6b;font-weight:bold;">${failCount}</span>
-                            （共 ${teamMembers.length} 票）
-                        </div>
-                    `;
-
-                    // 如果已经最终结算，直接显示结果（但 STATE.missionResult 不为 null，上面已处理，这里不会进入）
-                    // 但以防万一，再次检查
+                    // ✅ 根据是否已结算显示票数或等待信息
                     if (STATE.missionFinalized && STATE.missionResult !== null) {
-                        // 由上面的第一个 if 处理，所以这里不会执行
+                        const successCount = Object.values(taskResults).filter(v => v === '成功').length;
+                        const failCount = Object.values(taskResults).filter(v => v === '失败').length;
+                        votes.innerHTML = `
+            <div style="font-size:16px;color:#8899aa;">
+                成功票：<span style="color:#6fcf97;font-weight:bold;">${successCount}</span> ／
+                失败票：<span style="color:#ff6b6b;font-weight:bold;">${failCount}</span>
+                （共 ${teamMembers.length} 票）
+            </div>
+        `;
+                    } else {
+                        // 未结算，不显示票数
+                        votes.innerHTML = `<div style="font-size:16px;color:#8899aa;text-align:center;">⏳ 任务结果待公布...</div>`;
                     }
 
-                    // ----- 核心修复：显示结算按钮（仅车长可见） -----
+                    // ----- 显示结算按钮（仅车长可见） -----
                     if (isCurrentLeader) {
                         // 车长：自动结算（但可能因锁失败，所以保留按钮）
                         // 如果还未结算，自动调用一次
@@ -6039,28 +6036,25 @@ ${STATE.proposalRejectCount >= 4
 
                         // 显示一个手动结算按钮，作为兜底
                         const actionHtml = `
-                            <div style="text-align:center;margin-top:10px;">
-                                <button class="btn btn-success" id="manualFinalizeBtn" style="padding:12px 32px;font-size:18px;">
-                                    ⚡ 结算任务
-                                </button>
-                                <span style="font-size:13px;color:#8899aa;margin-left:10px;">
-                                    （如未自动结算，请点击此按钮）
-                                </span>
-                            </div>
-                        `;
+            <div style="text-align:center;margin-top:10px;">
+                <button class="btn btn-success" id="manualFinalizeBtn" style="padding:12px 32px;font-size:18px;" ${STATE.missionFinalized ? 'disabled' : ''}>
+                    ⚡ 结算任务
+                </button>
+                <span style="font-size:13px;color:#8899aa;margin-left:10px;">${STATE.missionFinalized ? '✅ 已结算' : '点击结算任务'}</span>
+            </div>
+        `;
                         action.innerHTML = actionHtml;
 
-                        // 绑定按钮事件（移除旧监听避免重复）
+                        // 绑定按钮事件
                         const btn = document.getElementById('manualFinalizeBtn');
                         if (btn) {
                             btn.onclick = function () {
-                                // 重置本地防重复标志，以便重试
                                 STATE._resultShown = false;
                                 finalizeMissionResult(null);
                             };
                         }
 
-                        // 同时，如果已经结算完成（missionFinalized 为 true），隐藏按钮
+                        // 如果已经结算完成，隐藏按钮并显示成功信息
                         if (STATE.missionFinalized) {
                             const btn = document.getElementById('manualFinalizeBtn');
                             if (btn) btn.style.display = 'none';

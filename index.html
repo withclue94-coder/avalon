@@ -3262,7 +3262,7 @@
                     const skillStatus = STATE.oberonSkillUsed ? '（已使用）' : '（未使用）';
                     let targetInfo = '';
                     if (STATE.oberonSkillUsed && STATE.oberonTarget) {
-                        const targetName = players[STATE.oberonTarget]?.name || '未知';
+                        const targetName = STATE.allPlayers[STATE.oberonTarget]?.name || '未知';
                         targetInfo = `<br><span style="color:#f0a500;font-size:13px;">🎯 已将 ${escapeHtml(targetName)} 的好票变为坏票</span>`;
                     }
                     infoHtml = '<div class="info-label">🔍 你是孤狼</div><div class="info-value">你看不到任何坏人同伴，其他坏人也看不到你。<br><span style="color:#8899aa;font-size:13px;">💡 被动技能：上车投坏票时，随机将一张好票变为坏票（整局一次）</span>' + targetInfo + '</div>';
@@ -4048,6 +4048,7 @@
         // missionFinalizing：表示当前是否有客户端正在处理结算。
         // ----- 完成任务结果 -----
         async function finalizeMissionResult(taskFailed) {
+            let finalOberonTarget = null;
             if (!STATE.roomId) return;
 
             // ============================================================

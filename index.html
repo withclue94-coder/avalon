@@ -8111,13 +8111,17 @@ ${STATE.proposalRejectCount >= 4
                 testModeControls.classList.remove('hidden');
                 showToast('🧪 测试模式已开启', 1500);
                 if (STATE.roomId) db.ref('rooms/' + STATE.roomId).update({ isTestMode: true });
+                // ✅ 刷新虚拟玩家列表，显示当前已存在的虚拟玩家（包括管理员自己）
+                renderVirtualAvatars();
             } else {
                 testModeControls.classList.add('hidden');
                 showToast('测试模式已关闭', 1500);
                 if (STATE.roomId) db.ref('rooms/' + STATE.roomId).update({ isTestMode: false });
                 if (STATE.currentViewUid && isVirtual(STATE.currentViewUid)) {
                     STATE.currentViewUid = STATE.myUid;
-                    refreshAllUI(); renderAdminPlayerList(); renderVirtualAvatars();
+                    refreshAllUI();
+                    renderAdminPlayerList();
+                    renderVirtualAvatars();
                 }
             }
         });

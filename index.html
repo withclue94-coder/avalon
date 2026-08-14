@@ -5474,7 +5474,7 @@ ${STATE.proposalRejectCount >= 4
                             const resultText = entry.result === '成功' ? '✅ 成功' : '❌ 失败';
                             histHtml += `<div >📌 第 ${entry.round} 轮任务：${resultText}</div> `;
                             histHtml += `<div style="font-size:12px;color:#ccc;" > 队员：${entry.teamMembers.map(m => escapeHtml(m.name)).join('、')}</div> `;
-                            histHtml += `<div style="font-size:12px;color:#ccc;" > 成功票：${entry.successCount}，失败票：${entry.failCount}（需${entry.requiredFails} 票失败）</div> `;
+                            histHtml += `<div style="font-size:12px;color:#ccc;" > 成功票：${entry.successCount}，失败票：${entry.failCount}（需${entry.requiredFailCount} 票失败）</div> `;
                         }
                         histHtml += '</div>';
                     });
@@ -5781,8 +5781,64 @@ ${STATE.proposalRejectCount >= 4
                 // 1. 如果已经结算完成（STATE.missionResult 已存在），直接显示结果
                 // ============================================================
                 if (STATE.missionResult !== null) {
-                    // ... 保持原有显示结果代码不变 ...
-                    // （此处省略，与原代码一致）
+                    const resultEl = document.getElementById('dayMissionResult');
+                    const votesEl = document.getElementById('dayMissionVotes');
+                    const teamEl = document.getElementById('dayMissionTeam');
+
+                    const result = STATE.missionResult;
+                    const resultText = result === '成功' ? '✅ 任务成功' : '❌ 任务失败';
+                    const color = result === '成功' ? '#6fcf97' : '#ff6b6b';
+
+                    // 显示队伍和票数（同原有逻辑）
+                    teamEl.innerHTML = `<div style="font-size:15px;">执行任务的玩家：${STATE.missionTeam.map(uid => allPlayers[uid]?.name || '未知').join('、')}</div>`;
+                    const successCount = Object.values(STATE.missionTaskResults || {}).filter(v => v === '成功').length;
+                    const failCount = Object.values(STATE.missionTaskResults || {}).filter(v => v === '失败').length;
+                    votesEl.innerHTML = `<div style="font-size:16px;color:#8899aa;">成功票：<span style="color:#6fcf97;font-weight:bold;">${successCount}</span> ／ 失败票：<span style="color:#ff6b6b;font-weight:bold;">${failCount}</span></div>`;
+
+                    const advanceAt = Number(STATE.missionAdvanceAt || 0);
+                    const remaining = advanceAt ? Math.max(0, advanceAt - Date.now()) : 0;
+                    const remainingSeconds = Math.ceil(remaining / 1000);
+
+                    // 创建结果容器，带倒计时 ID
+                    resultEl.innerHTML = `
+        <div style="font-size:24px;font-weight:bold;color:${color};">${resultText}</div>
+        <div id="countdownDisplay" style="margin-top:10px;font-size:14px;color:#8899aa;">
+            ${advanceAt ? `${remainingSeconds} 秒后进入下一轮任务` : '正在进入下一轮……'}
+        </div>
+    `;
+
+                    // 清除旧的定时器（避免累积）
+                    if (window._countdownTimer) {
+                        clearInterval(window._countdownTimer);
+                        window._countdownTimer = null;
+                    }
+
+                    // 如果有倒计时，启动每秒更新
+                    if (advanceAt) {
+                        window._countdownTimer = setInterval(() => {
+                            const now = Date.now();
+                            const left = Math.max(0, advanceAt - now);
+                            const secs = Math.ceil(left / 1000);
+                            const display = document.getElementById('countdownDisplay');
+                            if (display) {
+                                if (secs > 0) {
+                                    display.textContent = `${secs} 秒后进入下一轮任务`;
+                                } else {
+                                    display.textContent = '⏳ 正在进入下一轮……';
+                                    clearInterval(window._countdownTimer);
+                                    window._countdownTimer = null;
+                                }
+                            } else {
+                                clearInterval(window._countdownTimer);
+                                window._countdownTimer = null;
+                            }
+                        }, 500);
+                    }
+
+                    // 动作区域清空
+                    document.getElementById('dayMissionAction').innerHTML = '';
+                    scheduleMissionAdvance(remaining);
+                    updateViewIndicators();
                     return;
                 }
 

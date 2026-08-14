@@ -5154,6 +5154,7 @@
 
             // 构建状态键（包含所有选举相关数据）
             const stateKey = JSON.stringify({
+                effectiveUid,   // ✅ 新增
                 electPhase,
                 candidates: candidates.sort(),
                 electChoice,
@@ -5409,6 +5410,7 @@
         }
 
         // ----- 任务阶段渲染（包含组队、投票、执行、历史记录） -----
+        let lastDayMissionSelectingState = '';
         function renderDayMission() {
             const subtitle = document.getElementById('dayMissionSubtitle');
             const info = document.getElementById('dayMissionInfo');
@@ -5607,6 +5609,23 @@ ${STATE.proposalRejectCount >= 4
 
             // ---------- 组队选择 ----------
             if (missionPhase === 'selecting') {
+                // ✅ 新增：视角切换缓存判断
+                const selectingStateKey = JSON.stringify({
+                    effectiveUid: getEffectiveUid(),
+                    missionTeam: STATE.missionTeam,
+                    missionOrder: STATE.missionOrder,
+                    missionLeaderIndex: STATE.missionLeaderIndex,
+                    missionDirection: STATE.missionDirection,
+                    missionRound: STATE.missionRound
+                });
+
+                if (selectingStateKey === lastDayMissionSelectingState && document.getElementById('missionSelectGrid')) {
+                    // 状态未变，跳过重绘，但需要更新视角指示器
+                    updateViewIndicators();
+                    return;
+                }
+                lastDayMissionSelectingState = selectingStateKey;
+
                 let teamHtml = '';
                 // 始终显示发车顺序
                 const order = STATE.missionOrder || [];

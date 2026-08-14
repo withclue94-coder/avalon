@@ -4917,10 +4917,11 @@
                     latestData.oberonSkillUsed ||
                     false,
 
-                // 只清除上一轮奥伯伦的改票目标
+                // 保留本局奥伯伦改票记录
                 oberonTarget:
-                    null,
-            };
+                latestData.oberonTarget ||
+                null,
+                };
 
             try {
 

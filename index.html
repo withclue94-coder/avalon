@@ -2297,8 +2297,8 @@
 
                 roleDesc =
                     isCustom
-                        ? '好人阵营 · 能看到除莫德雷德外的所有坏人，以及倒影'
-                        : '好人阵营 · 能看到除莫德雷德外的所有坏人';
+                        ? '好人阵营 · 能看到除<span style="color:#f0a500;">莫德雷德</span>外的所有坏人，以及<span style="color:#f0a500;">倒影</span>'
+                        : '好人阵营 · 能看到除<span style="color:#f0a500;">莫德雷德</span>外的所有坏人';
             }
 
             // ============================================================
@@ -2329,9 +2329,9 @@
                     return p.role && badRoles.includes(p.role);
                 }).map(uid => allPlayers[uid].name);
                 infoHtml += `<div style="margin-top:8px;padding:10px;background:#1a2744;border-radius:8px;">
-            <div style="color:#8899aa;">🔴 坏人名单（不含莫德雷德）</div>
+            <div style="color:#8899aa;">🔴 坏人名单（不含<span style="color:#f0a500;">莫德雷德</span>）</div>
             <div style="color:#eee;font-weight:500;">${badGuys.length ? badGuys.join('、') : '无'}</div>
-            ${isCustom ? '<div style="color:#667788;font-size:12px;margin-top:4px;">💡 自定义板子：倒影也被视为坏人</div>' : ''}
+            ${isCustom ? '<div style="color:#667788;font-size:12px;margin-top:4px;">💡 这里面包括好人阵营的<span style="color:#f0a500;">倒影</span></div>' : ''}
         </div>`;
             }
             else if (role === '派西维尔') {
@@ -2341,7 +2341,7 @@
                 }).map(uid => allPlayers[uid].name);
                 const shuffled = shuffleArray([...targets]);
                 infoHtml += `<div style="margin-top:8px;padding:10px;background:#1a2744;border-radius:8px;">
-            <div style="color:#8899aa;">👀 以下两人中一位是梅林，一位是莫甘娜</div>
+            <div style="color:#8899aa;">👀 以下两人中一位是<span style="color:#f0a500;">梅林</span>，一位是<span style="color:#f0a500;">莫甘娜</span></div>
             <div style="color:#eee;font-weight:500;">${shuffled.join('  、 ')}</div>
         </div>`;
             }
@@ -2472,15 +2472,15 @@
                 const merlinUid = playerIds.find(uid => allPlayers[uid].role === '梅林');
                 const merlinName = merlinUid ? allPlayers[merlinUid].name : '未知';
                 infoHtml += `<div style="margin-top:8px;padding:10px;background:#1a2744;border-radius:8px;">
-            <div style="color:#8899aa;">👀 你能看到梅林</div>
-            <div style="color:#eee;font-weight:500;">梅林是：${merlinName}</div>
-            <div style="color:#667788;font-size:12px;margin-top:4px;">💡 在梅林眼中，你被视为坏人，但你是好人阵营</div>
+            <div style="color:#8899aa;">👀 你能看到<span style="color:#f0a500;">梅林</span></div>
+            <div style="color:#eee;font-weight:500;"><span style="color:#f0a500;">梅林</span>是：${merlinName}</div>
+            <div style="color:#667788;font-size:12px;margin-top:4px;">💡 在<span style="color:#f0a500;">梅林</span>眼中，你被视为坏人，但你是好人阵营</div>
         </div>`;
             }
             else if (role === '骑士') {
                 infoHtml += `<div style="margin-top:8px;padding:10px;background:#1a2744;border-radius:8px;">
             <div style="color:#8899aa;">⚔️ 骑士能力</div>
-            <div style="color:#eee;font-weight:500;">天黑时，你可以选择查验一名玩家的阵营（莫德雷德也显示为好人）。</div>
+            <div style="color:#eee;font-weight:500;">天黑时，你可以选择查验一名玩家的阵营（<span style="color:#f0a500;">莫德雷德</span>也显示为好人）。</div>
         </div>`;
                 // ✅ 新增：显示已查验的结果
                 if (STATE.nightActions && STATE.nightActions.knightChecked) {
@@ -2496,7 +2496,7 @@
             else if (role === '守卫') {
                 infoHtml += `<div style="margin-top:8px;padding:10px;background:#1a2744;border-radius:8px;">
             <div style="color:#8899aa;">🛡️ 守卫能力</div>
-            <div style="color:#eee;font-weight:500;">天黑时，你可以选择一名玩家守护，若守护到梅林，梅林被刺杀时也是好人胜利。</div>
+            <div style="color:#eee;font-weight:500;">天黑时，你可以选择一名玩家守护，若守护到<span style="color:#f0a500;">梅林</span>，<span style="color:#f0a500;">梅林</span>被刺杀时也是好人胜利。</div>
         </div>`;
                 // ✅ 新增：显示已守护的对象
                 if (STATE.nightActions && STATE.nightActions.guardTarget) {
@@ -2504,7 +2504,7 @@
                     const guardName = allPlayers[guardUid]?.name || '未知';
                     infoHtml += `<div style="margin-top:8px;padding:10px;background:#1a2744;border-radius:8px;border-left:3px solid #f0a500;">
             <div style="color:#8899aa;">🛡️ 你守护了：${escapeHtml(guardName)}</div>
-            <div style="color:#667788;font-size:12px;">若该玩家是梅林，被刺杀时好人将胜利</div>
+            <div style="color:#667788;font-size:12px;">若该玩家是<span style="color:#f0a500;">梅林</span>，被刺杀时好人将胜利</div>
         </div>`;
                 }
             }

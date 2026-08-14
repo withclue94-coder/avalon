@@ -2964,6 +2964,7 @@
                 lobbyRoomInfo.textContent = '房间: ' + STATE.roomId + ' · ' + playerIds.length + ' 人';
                 // 更新规则显示
                 updateLobbyRuleDisplay();
+                updateViewIndicators(); // ✅ 添加这一行
                 return;
             }
 

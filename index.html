@@ -3420,80 +3420,36 @@
 
         // ----- 保存任务历史到 Firebase -----
         function saveMissionHistory(roomId, round, taskFailed, teamMembers, taskResults, config) {
-            const historyRef =
-                db.ref(
-                    'rooms/' +
-                    roomId +
-                    '/missionHistory'
-                );
+            const historyRef = db.ref('rooms/' + roomId + '/electionHistory');  // ✅ 写入 electionHistory
 
             const historyEntry = {
                 type: 'mission',
                 round: round,
-
-                teamMembers:
-                    teamMembers.map(uid => ({
-                        uid: uid,
-                        name:
-                            STATE.allPlayers[uid]?.name ||
-                            '未知'
-                    })),
-
-                taskResults:
-                    Object.keys(taskResults).map(uid => ({
-                        uid: uid,
-                        name:
-                            STATE.allPlayers[uid]?.name ||
-                            '未知',
-                        result:
-                            taskResults[uid]
-                    })),
-
-                successCount:
-                    Object.values(taskResults)
-                        .filter(
-                            value => value === '成功'
-                        )
-                        .length,
-
-                failCount:
-                    Object.values(taskResults)
-                        .filter(
-                            value => value === '失败'
-                        )
-                        .length,
-
-                result:
-                    taskFailed
-                        ? '任务失败'
-                        : '任务成功',
-
-                requiredFailCount:
-                    config.fail,
-
-                timestamp:
-                    Date.now()
+                teamMembers: teamMembers.map(uid => ({
+                    uid: uid,
+                    name: STATE.allPlayers[uid]?.name || '未知'
+                })),
+                taskResults: Object.keys(taskResults).map(uid => ({
+                    uid: uid,
+                    name: STATE.allPlayers[uid]?.name || '未知',
+                    result: taskResults[uid]
+                })),
+                successCount: Object.values(taskResults).filter(value => value === '成功').length,
+                failCount: Object.values(taskResults).filter(value => value === '失败').length,
+                result: taskFailed ? '任务失败' : '任务成功',
+                requiredFailCount: config.fail,
+                timestamp: Date.now()
             };
 
             return historyRef
                 .once('value')
                 .then(snapshot => {
-                    const history =
-                        snapshot.val() || [];
-
-                    history.push(
-                        historyEntry
-                    );
-
-                    return historyRef.set(
-                        history
-                    );
+                    const history = snapshot.val() || [];
+                    history.push(historyEntry);
+                    return historyRef.set(history);
                 })
                 .catch(err => {
-                    console.error(
-                        '保存任务历史失败:',
-                        err
-                    );
+                    console.error('保存任务历史失败:', err);
                 });
         }
 
@@ -7317,6 +7273,11 @@ ${STATE.proposalRejectCount >= 4
                     }
                 }
                 if (STATE.isAdmin) { renderAdminPlayerList(); renderVirtualAvatars(); }
+                // 如果身份模态框打开，自动刷新内容
+                const identityModal = document.getElementById('identityModal');
+                if (identityModal && identityModal.style.display === 'flex' && identityModal.classList.contains('show')) {
+                    updateIdentityContent();
+                }
                 updateViewIndicators();
                 // 如果当前是管理员，更新面板状态
                 if (STATE.isAdmin) {

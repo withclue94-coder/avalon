@@ -2073,6 +2073,51 @@
             const s = seed || name || 'default';
             return 'https://api.dicebear.com/9.x/notionists/svg?seed=' + encodeURIComponent(s);
         }
+        // ============================================================
+        // 头像终极保护：远程和本地都失败时，显示首字母
+        // ============================================================
+        window.avatarErrorHandler = function (img, identifier, name) {
+            // 防止死循环
+            if (img.dataset.retried === 'true') {
+                // 终极备选：用首字母替换图片
+                const initial = (name || '?').charAt(0).toUpperCase();
+                const parent = img.parentNode;
+                const span = document.createElement('span');
+                span.style.cssText = `
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            height: 100%;
+            background: #2a3a5a;
+            color: #f0a500;
+            font-size: 20px;
+            font-weight: bold;
+            border-radius: 50%;
+            text-transform: uppercase;
+        `;
+                span.textContent = initial;
+                parent.replaceChild(span, img);
+                return;
+            }
+
+            // 标记已重试
+            img.dataset.retried = 'true';
+
+            // 如果当前正在尝试远程，改为本地
+            if (img.src.includes('dicebear')) {
+                const localUrl = getLocalAvatarUrl(identifier);
+                img.src = localUrl;
+                return;
+            }
+
+            // 如果本地也失败，进入终极保护（递归调用，但会被上面拦截）
+            img.onerror = function () {
+                avatarErrorHandler(this, identifier, name);
+            };
+            // 重新加载当前地址（触发onerror）
+            img.src = img.src;
+        };
         function isVirtual(uid) { return uid && uid.startsWith('virtual_'); }
         function isAdminUid(uid) { return uid && uid.startsWith('admin_'); }
         function getDeviceId() { let id = localStorage.getItem('avalon_device_id'); if (!id) { id = 'dev_' + Date.now() + '_' + Math.random().toString(36).substring(2, 8); localStorage.setItem('avalon_device_id', id); } return id; }
@@ -2549,12 +2594,11 @@
                 const isSelected = (uid === selectedTarget);
                 // ✅ 定义远程和本地头像地址
                 const remoteUrl = getAvatarUrl(p.name, p.name);
-                const localFallback = getLocalAvatarUrl(uid);
 
                 if (isBad) {
                     // 坏人同伴：显示但不可点击
                     html += `<div class="player-card" style="cursor:not-allowed;opacity:0.6;border-color:#2a3a5a;">
-            <span class="avatar"><img src="${remoteUrl}" alt="" onerror="this.onerror=null; this.src='${localFallback}'"></span>
+    <span class="avatar"><img src="${remoteUrl}" alt="${escapeHtml(p.name)}" onerror="avatarErrorHandler(this, '${uid}', ${JSON.stringify(p.name)})"></span>
             <span class="name">${escapeHtml(p.name)}</span>
             <div style="font-size:12px;color:#ff6b6b;">👥 同伴（不可选）</div>
         </div>`;
@@ -2563,7 +2607,7 @@
                     const borderColor = isSelected ? '#f0a500' : '#2a3a5a';
                     const shadow = isSelected ? '0 0 20px rgba(240,165,0,0.5)' : 'none';
                     html += `<div class="player-card" style="cursor:pointer;border-color:${borderColor};box-shadow:${shadow};transition:all 0.3s;" onclick="selectAssassinationTarget('${uid}')">
-            <span class="avatar"><img src="${remoteUrl}" alt="" onerror="this.onerror=null; this.src='${localFallback}'"></span>
+            <span class="avatar"><img src="${remoteUrl}" alt="${escapeHtml(p.name)}" onerror="avatarErrorHandler(this, '${uid}', ${JSON.stringify(p.name)})"></span>
             <span class="name">${escapeHtml(p.name)}</span>
             <div style="font-size:12px;color:#667788;">👤 ？？？</div>
             ${isSelected ? '<div style="font-size:14px;color:#f0a500;font-weight:bold;">✅ 已选中</div>' : ''}
@@ -2641,7 +2685,6 @@
             // 更新头像和名字（如果有）
             if (isTestView && player) {
                 const remoteUrl = getAvatarUrl(player.name, player.name);          // 远程 DiceBear 地址
-                const localFallback = getLocalAvatarUrl(STATE.currentViewUid);     // 本地备用地址（使用当前视角的 uid）
                 const avatarIds = ['viewIndicatorAvatar', 'viewIndicatorAvatar2', 'viewIndicatorAvatar3', 'viewIndicatorAvatar4', 'viewIndicatorAvatar5', 'viewIndicatorAvatar6'];
                 const nameIds = ['viewIndicatorName', 'viewIndicatorName2', 'viewIndicatorName3', 'viewIndicatorName4', 'viewIndicatorName5', 'viewIndicatorName6'];
                 avatarIds.forEach(id => {
@@ -2650,8 +2693,7 @@
                         img.src = remoteUrl;
                         // 关键：绑定 onerror，加载失败时切换到本地头像
                         img.onerror = function () {
-                            this.onerror = null;       // 防止循环
-                            this.src = localFallback;
+                            avatarErrorHandler(this, STATE.currentViewUid, player.name);
                         };
                     }
                 });
@@ -2680,11 +2722,10 @@
                     const isHost = p.isHost || false;
                     const isVirtualPlayer = isVirtual(uid);
                     const avatar = getAvatarUrl(p.name, p.name);    // 原来 DiceBear 的 URL
-                    const localFallback = getLocalAvatarUrl(uid);    // 本地 assets/avatars/avatarXX.svg
                     // 踢出按钮：仅当管理员且当前视角为自己时显示（不能踢自己）
                     const showKick = STATE.isAdmin && effectiveUid === STATE.myUid && uid !== effectiveUid;
                     html += `<div class="player-card">
-    <span class="avatar"><img src="${avatar}" alt="" onerror="this.onerror=null; this.src='${localFallback}'"></span>
+    <span class="avatar"><img src="${avatar}" alt="${escapeHtml(p.name)}" onerror="avatarErrorHandler(this, '${uid}', ${JSON.stringify(p.name)})"></span>
     <span class="name">${escapeHtml(p.name)}${isMe ? ' (你)' : ''}</span>
     <div class="badges">
         ${isHost ? '<span class="host-badge">房主</span>' : ''}
@@ -3004,9 +3045,8 @@
                         if (uid === currentUid) return;
                         const p = players[uid];
                         const remoteUrl = getAvatarUrl(p.name, p.name);
-                        const localFallback = getLocalAvatarUrl(uid);
                         html += `<div class="player-card" style="cursor:pointer;" onclick="knightCheck('${uid}')">
-                    <span class="avatar"><img src="${remoteUrl}" onerror="this.onerror=null; this.src='${localFallback}'" alt=""></span>
+                    <span class="avatar"><img src="${remoteUrl}" alt="${escapeHtml(p.name)}" onerror="avatarErrorHandler(this, '${uid}', ${JSON.stringify(p.name)})"></span>
                     <span class="name">${escapeHtml(p.name)}</span>
                 </div>`;
                     });
@@ -3025,9 +3065,8 @@
                         if (uid === currentUid) return;
                         const p = players[uid];
                         const remoteUrl = getAvatarUrl(p.name, p.name);
-                        const localFallback = getLocalAvatarUrl(uid);
                         html += `<div class="player-card" style="cursor:pointer;" onclick="guardProtect('${uid}')">
-                    <span class="avatar"><img src="${remoteUrl}" onerror="this.onerror=null; this.src='${localFallback}'" alt=""></span>
+                    <span class="avatar"><img src="${remoteUrl}" alt="${escapeHtml(p.name)}" onerror="avatarErrorHandler(this, '${uid}', ${JSON.stringify(p.name)})"></span>
                     <span class="name">${escapeHtml(p.name)}</span>
                 </div>`;
                     });
@@ -4889,9 +4928,8 @@
                     campaigners.forEach(uid => {
                         const p = allPlayers[uid];
                         const remoteUrl = getAvatarUrl(p.name, p.name);
-                        const localFallback = getLocalAvatarUrl(uid);
                         html += `<div class="player-card" style="padding:8px;">
-                        <span class="avatar" style="width:48px;height:48px;"><img src="${remoteUrl}" onerror="this.onerror=null; this.src='${localFallback}'" alt=""></span>
+                        <span class="avatar" style="width:48px;height:48px;"><img src="${remoteUrl}" alt="${escapeHtml(p.name)}" onerror="avatarErrorHandler(this, '${uid}', ${JSON.stringify(p.name)})"></span>
                         <span class="name" style="font-size:13px;">${escapeHtml(p.name)}</span>
                     </div>`;
                     });
@@ -4980,9 +5018,8 @@
                     const voters = Object.keys(electVotes).filter(v => electVotes[v] === uid).map(v => allPlayers[v]?.name || '未知');
                     const canVote = !candidateSet.has(effectiveUid) && !votedPlayers.includes(effectiveUid) && effectiveUid !== uid;
                     const remoteUrl = getAvatarUrl(p.name, p.name);
-                    const localFallback = getLocalAvatarUrl(uid);
                     html += `<div class="player-card" style="padding:12px 8px;">
-        <span class="avatar"><img src="${remoteUrl}" onerror="this.onerror=null; this.src='${localFallback}'" alt=""></span>
+        <span class="avatar"><img src="${remoteUrl}" alt="${escapeHtml(p.name)}" onerror="avatarErrorHandler(this, '${uid}', ${JSON.stringify(p.name)})"></span>
         <span class="name">${escapeHtml(p.name)}</span>
         <div style="font-size:14px;color:#f0a500;margin-top:4px;">${voteCount} 票</div>
         <div style="font-size:11px;color:#667788;min-height:20px;">${voters.length ? '投票人: ' + voters.join('、') : ''}</div>
@@ -5303,10 +5340,9 @@ ${STATE.proposalRejectCount >= 4
 
                         // 在循环内（playerIds.forEach 或类似）添加两行
                         const remoteUrl = getAvatarUrl(p.name, p.name);
-                        const localFallback = getLocalAvatarUrl(uid);
 
                         teamHtml += `<div class="player-card" style="border-color:${borderColor};${disabledStyle}" onclick="${(!isSelected && isFull) ? '' : `toggleMissionMember('${uid}')`}">
-    <span class="avatar"><img src="${remoteUrl}" onerror="this.onerror=null; this.src='${localFallback}'" alt=""></span>
+    <span class="avatar"><img src="${remoteUrl}" alt="${escapeHtml(p.name)}" onerror="avatarErrorHandler(this, '${uid}', ${JSON.stringify(p.name)})"></span>
     <span class="name">${escapeHtml(p.name)} ${isSelf ? '(你)' : ''}</span>
     ${isSelected ? '<div style="font-size:20px;color:#f0a500;">✅</div>' : (isFull ? '<div style="font-size:12px;color:#667788;">🔒</div>' : '')}
 </div>`;
@@ -6212,10 +6248,9 @@ ${STATE.proposalRejectCount >= 4
             if (STATE.isAdmin && STATE.myUid && STATE.allPlayers[STATE.myUid]) {
                 const me = STATE.allPlayers[STATE.myUid];
                 const remoteUrl = getAvatarUrl(me.name, me.name);
-                const localFallback = getLocalAvatarUrl(STATE.myUid);
                 const isActive = (STATE.currentViewUid === STATE.myUid);
                 html += `<div class="avatar-item ${isActive ? 'active' : ''}" onclick="switchView('${STATE.myUid}')" title="切换回自己" >
-                <img src="${remoteUrl}" onerror="this.onerror=null; this.src='${localFallback}'" alt="">
+    <img src="${remoteUrl}" alt="${escapeHtml(me.name)}" onerror="avatarErrorHandler(this, '${STATE.myUid}', ${JSON.stringify(me.name)})">
                 <span class="vname">${escapeHtml(me.name)} (你)</span>
                 ${isActive ? '<span style="font-size:8px;color:#f0a500;">👁️</span>' : ''}
             </div>`;
@@ -6228,10 +6263,9 @@ ${STATE.proposalRejectCount >= 4
                 virtuals.forEach(uid => {
                     const p = STATE.allPlayers[uid];
                     const avatar = getAvatarUrl(p.name, p.name);    // 原来 DiceBear 的 URL
-                    const localFallback = getLocalAvatarUrl(uid);    // 本地 assets/avatars/avatarXX.svg
                     const isActive = STATE.currentViewUid === uid;
                     html += `<div class="avatar-item ${isActive ? 'active' : ''}" onclick="switchView('${uid}')" >
-                <img src="${avatar}" alt="" onerror="this.onerror=null; this.src='${localFallback}'">
+    <img src="${remoteUrl}" alt="${escapeHtml(p.name)}" onerror="avatarErrorHandler(this, '${uid}', ${JSON.stringify(p.name)})">
                     <span class="vname">${escapeHtml(p.name)}</span>
                     ${isActive ? '<span style="font-size:8px;color:#f0a500;">👁️</span>' : ''}
                 </div>`;
@@ -6265,11 +6299,10 @@ ${STATE.proposalRejectCount >= 4
             html += `<button class="btn btn-xs btn-success" onclick="addAllPresets()" style="padding:4px 12px;margin-right:8px;" >➕ 全部加入</button> `;
             list.forEach(name => {
                 const remoteUrl = getAvatarUrl(name, name);
-                const localFallback = getLocalAvatarUrl(name);   // 使用 name 作为 uid
                 html += `<div class="preset-item">
-        <div class="avatar" onclick="addPresetToRoom('${escapeHtml(name)}')" title="点击添加到房间">
-            <img src="${remoteUrl}" alt="" onerror="this.onerror=null; this.src='${localFallback}'">
-        </div>
+    <div class="avatar">
+        <img src="${remoteUrl}" alt="${escapeHtml(name)}" onerror="avatarErrorHandler(this, ${JSON.stringify(name)}, ${JSON.stringify(name)})">
+    </div>
         <span class="pname" onclick="addPresetToRoom('${escapeHtml(name)}')">${escapeHtml(name)}</span>
         <button class="del-btn" onclick="removePresetPlayer('${escapeHtml(name)}')">✕</button>
     </div>`;

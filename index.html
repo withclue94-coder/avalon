@@ -3436,7 +3436,7 @@
                 })),
                 successCount: Object.values(taskResults).filter(value => value === '成功').length,
                 failCount: Object.values(taskResults).filter(value => value === '失败').length,
-                result: taskFailed ? '任务失败' : '任务成功',
+                result: taskFailed ? '失败' : '成功',
                 requiredFailCount: config.fail,
                 timestamp: Date.now()
             };
@@ -5184,55 +5184,37 @@
 
             // 竞选阶段
             if (electPhase === 'campaign') {
-                subtitle.textContent = '🗳️ 请选择：竞选或退选';
+                subtitle.textContent = '🗳️ 请选择：竞选或退选（选择将保密，所有人选定后自动公布竞选者）';
                 const totalPlayers = playerIds.length;
                 const decidedCount = playerIds.filter(uid => electChoice[uid] !== undefined).length;
 
-                const campaigners = playerIds.filter(uid => electChoice[uid] === 'campaign');
-                let html = '<div style="margin-bottom:12px;"><div style="font-size:15px;color:#8899aa;margin-bottom:8px;">当前竞选者：</div>';
-                if (campaigners.length === 0) {
-                    html += '<span style="color:#667788;">暂无</span>';
-                } else {
-                    html += '<div class="player-grid" style="grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));">';
-                    campaigners.forEach((uid, index) => {
-                        const p = allPlayers[uid];
-                        const remoteUrl = getAvatarUrl(p.name, p.name);
-                        const delay = index * 0.05;
-                        html += `<div class="player-card" style="padding:8px; animation-delay: ${delay}s;">
-                        <span class="avatar" style="width:48px;height:48px;"><img src="${remoteUrl}" alt="${escapeHtml(p.name)}" onerror="avatarErrorHandler(this, '${uid}', ${JSON.stringify(p.name)})"></span>
-                        <span class="name" style="font-size:13px;">${escapeHtml(p.name)}</span>
-                    </div>`;
-                    });
-                    html += '</div>';
-                }
-                html += '</div>';
-
-                html += '<div class="operation-area">';
+                let html = '<div class="operation-area">';
                 html += `<div class="progress-text">已选择：${decidedCount} / ${totalPlayers}</div>`;
                 const myChoice = electChoice[effectiveUid];
                 if (myChoice === undefined) {
                     html += `<div style="display:flex;gap:14px;justify-content:center;">
-                <button class="btn btn-primary" onclick="updateChoice('${effectiveUid}','campaign')" style="flex:1;padding:14px 20px;font-size:18px;">🗳️ 竞选</button>
-                <button class="btn btn-secondary" onclick="updateChoice('${effectiveUid}','withdrawn')" style="flex:1;padding:14px 20px;font-size:18px;">🚫 退选</button>
-            </div>`;
+            <button class="btn btn-primary" onclick="updateChoice('${effectiveUid}','campaign')" style="flex:1;padding:14px 20px;font-size:18px;">🗳️ 竞选</button>
+            <button class="btn btn-secondary" onclick="updateChoice('${effectiveUid}','withdrawn')" style="flex:1;padding:14px 20px;font-size:18px;">🚫 退选</button>
+        </div>`;
                 } else {
                     const choiceText = (myChoice === 'campaign') ? '已竞选' : '已退选';
                     const changeText = (myChoice === 'campaign') ? '改为退选' : '改为竞选';
                     const changeVal = (myChoice === 'campaign') ? 'withdrawn' : 'campaign';
                     html += `<div style="text-align:center;">
-                <div style="font-size:18px;margin-bottom:10px;">你已选择：${choiceText}</div>
-                <button class="btn btn-sm btn-secondary" onclick="updateChoice('${effectiveUid}','${changeVal}')" style="padding:10px 24px;font-size:16px;">切换为${changeText}</button>
-            </div>`;
+            <div style="font-size:18px;margin-bottom:10px;">你已选择：${choiceText}</div>
+            <button class="btn btn-sm btn-secondary" onclick="updateChoice('${effectiveUid}','${changeVal}')" style="padding:10px 24px;font-size:16px;">切换为${changeText}</button>
+        </div>`;
                 }
                 html += '</div>';
+
                 candidatesDiv.innerHTML = html;
                 votesDiv.innerHTML = '';
                 actionDiv.innerHTML = '';
                 if (actionArea) actionArea.style.display = 'none';
 
                 if (decidedCount === totalPlayers && totalPlayers > 0) {
-                    const hasCampaign = campaigners.length > 0;
-                    if (!hasCampaign) {
+                    const campaigners = playerIds.filter(uid => electChoice[uid] === 'campaign');
+                    if (campaigners.length === 0) {
                         showToast('至少需要一名玩家竞选', 2000);
                     } else {
                         const roomRef = db.ref('rooms/' + STATE.roomId);
@@ -7080,24 +7062,56 @@ ${STATE.proposalRejectCount >= 4
             roomRef.on('value', snapshot => {
                 const data = snapshot.val();
                 if (!data) {
-                    // 房间已被删除
                     showToast('房间已被解散', 3000);
+                    // 重置所有游戏状态（保留 myUid, isAdmin 等身份信息）
                     STATE.roomExists = false;
                     STATE.roomId = null;
-                    localStorage.removeItem('avalon_room_id');
-                    showEnterPage();
-                    // 重置状态
                     STATE.allPlayers = {};
-                    // 确保当前玩家在线（避免显示断线）
-                    if (STATE.myUid && STATE.allPlayers[STATE.myUid]) {
-                        STATE.allPlayers[STATE.myUid].online = true;
-                    }
                     STATE.gameStarted = false;
                     STATE.phase = 'lobby';
+                    STATE.electPhase = 'campaign';
+                    STATE.candidates = [];
+                    STATE.electChoice = {};
+                    STATE.electVotes = {};
+                    STATE.electFinished = false;
+                    STATE.leaderUid = null;
+                    STATE.missionPhase = 'selecting';
+                    STATE.missionTeam = [];
+                    STATE.missionVotes = {};
+                    STATE.missionTaskResults = {};
+                    STATE.missionResult = null;
+                    STATE.missionFinalized = false;
+                    STATE.missionFinalizing = null;
+                    STATE.missionAdvanceAt = null;
+                    STATE.missionAdvanceClaim = null;
+                    STATE.missionSuccessCount = 0;
+                    STATE.missionFailCount = 0;
+                    STATE.proposalRejectCount = 0;
+                    STATE.assassinUid = null;
+                    STATE.assassinationTarget = null;
+                    STATE.assassinationDone = false;
+                    STATE.assassinationInfo = null;
+                    STATE.winner = null;
+                    STATE.rule = null;
+                    STATE.nightActions = { knightChecked: null, knightResult: null, guardTarget: null };
+                    STATE.oberonSkillUsed = false;
+                    STATE.oberonTarget = null;
+                    STATE.oberonPending = false;
+                    STATE.electionHistory = [];
+                    STATE.playerNumbers = {};
+                    STATE.missionOrder = [];
+                    STATE.missionLeaderIndex = 0;
+                    STATE.missionDirection = 'clockwise';
+                    STATE.missionRound = 1;
+                    STATE._resultShown = false;
+                    STATE.missionFinalizing = null;
+                    STATE.missionAdvanceAt = null;
+                    STATE.missionAdvanceClaim = null;
+                    localStorage.removeItem('avalon_room_id');
+                    showEnterPage();
                     setStatus(roomStatusHint, '⏳ 房间已解散，等待房主创建...', 'info');
                     if (STATE.isAdmin) {
                         setStatus(adminRoomStatus, '⚠️ 房间已解散，请创建新房间', 'info');
-                        // 可选：隐藏已连接信息
                         const adminViewInfo = document.getElementById('adminViewInfo');
                         if (adminViewInfo) adminViewInfo.classList.add('hidden');
                     }

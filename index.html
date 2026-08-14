@@ -1660,6 +1660,8 @@
                     <button class="btn btn-sm btn-secondary" id="adminRefreshBtn">🔄 刷新</button>
                     <button class="btn btn-sm btn-danger" id="adminDissolveBtn" style="background:#6a1a1a;">🗑️
                         解散房间</button>
+                    <button class="btn btn-sm btn-danger" id="adminCleanRoomsBtn" style="background:#6a1a1a;">🧹
+                        清理空房间</button>
                 </div>
                 <div class="status-msg" id="adminRoomStatus"></div>
 
@@ -2017,7 +2019,7 @@
         // ============================================================
         // 开发配置：管理员登录默认显示
         // ============================================================
-        const SHOW_DEFAULT_ADMIN_CREDENTIALS = false; // 设为 false 则隐藏默认密码和名字，需要手动输入
+        const SHOW_DEFAULT_ADMIN_CREDENTIALS = true; // 设为 false 则隐藏默认密码和名字，需要手动输入
 
         let currentRuleTab = 'default'; // 'default' 或 'custom'
         let ruleModalMode = 'create'; // 'create' 或 'edit'
@@ -2845,7 +2847,8 @@
                     const isReady = p.isReady || false;
                     const isHost = p.isHost || false;
                     const isVirtualPlayer = isVirtual(uid);
-                    const isOffline = (p.online === false);
+                    // 改为（当前玩家永不显示断线）
+                    const isOffline = (p.online === false && uid !== effectiveUid);
                     const avatar = getAvatarUrl(p.name, p.name);
                     const showKick = STATE.isAdmin && effectiveUid === STATE.myUid && uid !== effectiveUid;
                     const delay = index * 0.05;
@@ -6356,6 +6359,10 @@ ${STATE.proposalRejectCount >= 4
         // ============================================================
         // 模块 9：管理员面板渲染
         // ============================================================
+        function renderAdminPlayerList() {
+            // 已删除管理员面板中的玩家列表，此函数保留空以兼容调用
+        }
+
         function renderVirtualAvatars() {
             const container = virtualAvatarList;
             const virtuals = Object.keys(STATE.allPlayers).filter(uid => isVirtual(uid));
@@ -6614,22 +6621,66 @@ ${STATE.proposalRejectCount >= 4
                 const data = snapshot.val();
                 if (data) {
                     const roomIds = Object.keys(data);
-                    // 过滤出有效房间（至少有一个玩家）
+                    let validRoomId = null;
+                    let validRoomData = null;
+                    const invalidRooms = [];
+
                     for (let rid of roomIds) {
                         const room = data[rid];
-                        if (room && room.players && Object.keys(room.players).length > 0) {
-                            STATE.roomId = rid;
-                            STATE.roomExists = true;
-                            // 同步房间数据到 STATE
-                            if (room.players) STATE.allPlayers = room.players;
-                            if (room.phase) STATE.phase = room.phase;
-                            if (room.gameStarted !== undefined) STATE.gameStarted = room.gameStarted;
-                            if (room.host) STATE.hostUid = room.host;
-                            if (room.rule) STATE.rule = room.rule;
-                            return { exists: true, roomId: rid, data: room };
+                        if (!room || !room.players) {
+                            invalidRooms.push(rid);
+                            continue;
+                        }
+                        const players = room.players;
+                        const hasRealOnline = Object.keys(players).some(uid => {
+                            return !isVirtual(uid) && (players[uid].online === true || players[uid].online === undefined);
+                        });
+                        if (hasRealOnline) {
+                            validRoomId = rid;
+                            validRoomData = room;
+                            break;
+                        } else {
+                            invalidRooms.push(rid);
                         }
                     }
 
+                    // 🧹 自动删除无效房间（无在线真人玩家）
+                    if (invalidRooms.length > 0) {
+                        const deletePromises = invalidRooms.map(rid => {
+                            return db.ref('rooms/' + rid).remove().catch(err => {
+                                console.warn('自动清理无效房间失败:', rid, err);
+                            });
+                        });
+                        return Promise.all(deletePromises).then(() => {
+                            if (validRoomId) {
+                                STATE.roomId = validRoomId;
+                                STATE.roomExists = true;
+                                STATE.allPlayers = validRoomData.players;
+                                STATE.phase = validRoomData.phase || 'lobby';
+                                STATE.gameStarted = validRoomData.gameStarted || false;
+                                STATE.hostUid = validRoomData.host || null;
+                                STATE.rule = validRoomData.rule || null;
+                                return { exists: true, roomId: validRoomId, data: validRoomData };
+                            }
+                            STATE.roomExists = false;
+                            STATE.roomId = null;
+                            if (STATE.isAdmin) {
+                                setStatus(adminRoomStatus, '⏳ 暂无房间，请点击创建房间', 'info');
+                            }
+                            return { exists: false };
+                        });
+                    }
+
+                    if (validRoomId) {
+                        STATE.roomId = validRoomId;
+                        STATE.roomExists = true;
+                        STATE.allPlayers = validRoomData.players;
+                        STATE.phase = validRoomData.phase || 'lobby';
+                        STATE.gameStarted = validRoomData.gameStarted || false;
+                        STATE.hostUid = validRoomData.host || null;
+                        STATE.rule = validRoomData.rule || null;
+                        return { exists: true, roomId: validRoomId, data: validRoomData };
+                    }
                 }
                 STATE.roomExists = false;
                 STATE.roomId = null;
@@ -6705,85 +6756,116 @@ ${STATE.proposalRejectCount >= 4
         }
 
         // 带规则创建房间
-        function createRoomWithRule(playerName, isAdmin = false, rule = null) {
-            // ✅ 新增：检查是否已有房间
-            return checkRoomExists().then(existing => {
-                if (existing.exists) {
-                    // 已有房间，不能创建新房间
-                    return { success: false, error: '已有房间存在，不能重复创建', roomId: existing.roomId };
-                }
-
-                const roomId = generateRoomId();
-                const uid = isAdmin ? getAdminUid() : getPlayerUid(playerName);
-                const roomRef = db.ref('rooms/' + roomId);
-                const playerData = { name: playerName, isHost: true, isReady: false, role: null, hasConfirmedNight: false, joinedAt: Date.now(), isVirtual: false, deviceId: getDeviceId() };
-                const defaultRule = rule || { playerCount: 5, roles: DEFAULT_ROLES_BY_PLAYER[5] };
-                return roomRef.set({
-                    host: uid,
-                    players: { [uid]: playerData },
-                    gameStarted: false,
-                    phase: 'lobby',
-                    createdAt: Date.now(),
-                    isTestMode: false,
-                    selectionOrder: [],
-                    currentSelectIndex: 0,
-                    // 选举字段
-                    electPhase: 'campaign',
-                    candidates: [],
-                    electChoice: {},
-                    electVotes: {},
-                    electFinished: false,
-                    leaderUid: null,
-                    electionHistory: [],
-                    // 任务字段
-                    missionPhase: 'selecting',
-                    missionTeam: [],
-                    missionVotes: {},
-                    missionDirection: 'clockwise',
-                    missionLeaderIndex: 0,
-                    missionOrder: [],
-                    missionFailCount: 0,
-                    missionSuccessCount: 0,
-                    proposalRejectCount: 0,
-                    missionResult: null,
-                    missionTaskResults: {},
-                    missionFinalized: false,
-                    // 当前任务没有客户端正在结算
-                    missionFinalizing: null,
-                    // 当前没有任务结果展示倒计时
-                    missionAdvanceAt: null,
-                    // 当前没有客户端认领下一轮推进
-                    missionAdvanceClaim: null,
-                    playerNumbers: {},
-                    round: 1,
-                    // 刺客字段
-                    assassinUid: null,
-                    assassinationTarget: null,
-                    assassinationDone: false,
-                    // 结算
-                    winner: null,
-                    // 自定义板子奥伯伦技能
-                    oberonSkillUsed: false,
-                    oberonTarget: null,
-                    // 规则
-                    rule: defaultRule
-                }).then(() => {
-                    STATE.roomId = roomId;
-                    STATE.myUid = uid;
-                    STATE.isHost = true;
-                    STATE.roomExists = true;
-                    STATE.allPlayers = { [uid]: playerData };
-                    STATE.isAdmin = isAdmin;
-                    localStorage.setItem('avalon_room_id', roomId);
-                    localStorage.setItem('avalon_player_name', playerName);
-                    // 添加这两行：切换到大厅并开始监听
-                    showLobbyPage();
-                    renderLobby();
-                    listenRoom(roomId);
-                    return { success: true, roomId };
-                }).catch(err => ({ success: false, error: err.message }));
-            });
+function createRoomWithRule(playerName, isAdmin = false, rule = null) {
+    // ✅ 第一步：先强制清理所有无效房间（避免残留导致创建第二个房间）
+    return checkRoomExists().then(existing => {
+        // 如果仍然存在有效房间（有在线真人玩家），则不能创建
+        if (existing.exists) {
+            return { success: false, error: '已有有效房间存在，不能重复创建', roomId: existing.roomId };
         }
+
+        // 没有有效房间，正常创建
+        const roomId = generateRoomId();
+        const uid = isAdmin ? getAdminUid() : getPlayerUid(playerName);
+        const roomRef = db.ref('rooms/' + roomId);
+        const playerData = {
+            name: playerName,
+            isHost: true,
+            isReady: false,
+            role: null,
+            hasConfirmedNight: false,
+            joinedAt: Date.now(),
+            isVirtual: false,
+            deviceId: getDeviceId(),
+            online: true // 标记自己在线
+        };
+        const defaultRule = rule || { playerCount: 5, roles: DEFAULT_ROLES_BY_PLAYER[5] };
+
+        return roomRef.set({
+            host: uid,
+            players: { [uid]: playerData },
+            gameStarted: false,
+            phase: 'lobby',
+            createdAt: Date.now(),
+            isTestMode: false,
+            selectionOrder: [],
+            currentSelectIndex: 0,
+            // 选举字段
+            electPhase: 'campaign',
+            candidates: [],
+            electChoice: {},
+            electVotes: {},
+            electFinished: false,
+            leaderUid: null,
+            electionHistory: [],
+            // 任务字段
+            missionPhase: 'selecting',
+            missionTeam: [],
+            missionVotes: {},
+            missionDirection: 'clockwise',
+            missionLeaderIndex: 0,
+            missionOrder: [],
+            missionFailCount: 0,
+            missionSuccessCount: 0,
+            proposalRejectCount: 0,
+            missionResult: null,
+            missionTaskResults: {},
+            missionFinalized: false,
+            // 当前任务没有客户端正在结算
+            missionFinalizing: null,
+            // 当前没有任务结果展示倒计时
+            missionAdvanceAt: null,
+            // 当前没有客户端认领下一轮推进
+            missionAdvanceClaim: null,
+            playerNumbers: {},
+            round: 1,
+            // 刺客字段
+            assassinUid: null,
+            assassinationTarget: null,
+            assassinationDone: false,
+            // 结算
+            winner: null,
+            // 自定义板子奥伯伦技能
+            oberonSkillUsed: false,
+            oberonTarget: null,
+            // 规则
+            rule: defaultRule,
+            // 夜间动作
+            nightActions: {
+                knightChecked: null,
+                knightResult: null,
+                guardTarget: null
+            }
+        }).then(() => {
+            // ✅ 创建成功后，设置自己的在线状态，并提前取消可能的旧 onDisconnect
+            const onlineRef = db.ref('rooms/' + roomId + '/players/' + uid + '/online');
+            onlineRef.onDisconnect().cancel();  // 取消之前的，避免残留
+            onlineRef.onDisconnect().set(false);
+            onlineRef.set(true);
+
+            STATE.roomId = roomId;
+            STATE.myUid = uid;
+            STATE.isHost = true;
+            STATE.roomExists = true;
+            STATE.allPlayers = { [uid]: { ...playerData, online: true } };
+            STATE.isAdmin = isAdmin;
+            localStorage.setItem('avalon_room_id', roomId);
+            localStorage.setItem('avalon_player_name', playerName);
+
+            // 更新管理员面板状态
+            if (isAdmin) {
+                setStatus(adminRoomStatus, '✅ 已连接到房间: ' + roomId, 'success');
+                adminToggleBtn.classList.add('visible');
+            }
+
+            // 切换到大厅并开始监听
+            showLobbyPage();
+            renderLobby();
+            listenRoom(roomId);
+            return { success: true, roomId };
+        }).catch(err => ({ success: false, error: err.message }));
+    });
+}
 
         function joinRoom(roomId, playerName, uid = null) {
             const roomRef = db.ref('rooms/' + roomId);
@@ -6796,16 +6878,20 @@ ${STATE.proposalRejectCount >= 4
                 let targetUid = uid;
                 // 如果传入了 uid，检查该 uid 是否已存在
                 if (targetUid && players[targetUid]) {
-                    // 该 uid 已存在，直接复用，更新名字和设备 ID
+                    // 该 uid 已存在，直接复用，更新名字和设备 ID，并设置 online
                     const updates = {
                         ['players/' + targetUid + '/name']: playerName,
                         ['players/' + targetUid + '/deviceId']: getDeviceId(),
+                        ['players/' + targetUid + '/online']: true, // ✅ 确保在线
                     };
                     STATE.myUid = targetUid;
                     STATE.isHost = players[targetUid].isHost || false;
                     STATE.allPlayers = { ...players };
                     localStorage.setItem('avalon_room_id', roomId);
                     localStorage.setItem('avalon_player_name', playerName);
+                    // 更新后，设置 onDisconnect
+                    const onlineRef = db.ref('rooms/' + roomId + '/players/' + targetUid + '/online');
+                    onlineRef.onDisconnect().set(false);
                     return roomRef.update(updates).then(() => ({ success: true, existing: true }));
                 }
 
@@ -6826,12 +6912,15 @@ ${STATE.proposalRejectCount >= 4
                     const updates = {
                         ['players/' + uid + '/name']: playerName,
                         ['players/' + uid + '/deviceId']: deviceId,
+                        ['players/' + uid + '/online']: true, // ✅ 确保在线
                     };
                     STATE.myUid = uid;
                     STATE.isHost = players[uid].isHost || false;
                     STATE.allPlayers = { ...players };
                     localStorage.setItem('avalon_room_id', roomId);
                     localStorage.setItem('avalon_player_name', playerName);
+                    const onlineRef = db.ref('rooms/' + roomId + '/players/' + uid + '/online');
+                    onlineRef.onDisconnect().set(false);
                     return roomRef.update(updates).then(() => ({ success: true, existing: true }));
                 }
 
@@ -6848,12 +6937,15 @@ ${STATE.proposalRejectCount >= 4
                     const updates = {
                         ['players/' + uid + '/name']: playerName,
                         ['players/' + uid + '/deviceId']: deviceId,
+                        ['players/' + uid + '/online']: true, // ✅ 确保在线
                     };
                     STATE.myUid = uid;
                     STATE.isHost = players[uid].isHost || false;
                     STATE.allPlayers = { ...players };
                     localStorage.setItem('avalon_room_id', roomId);
                     localStorage.setItem('avalon_player_name', playerName);
+                    const onlineRef = db.ref('rooms/' + roomId + '/players/' + uid + '/online');
+                    onlineRef.onDisconnect().set(false);
                     return roomRef.update(updates).then(() => ({ success: true, existing: true }));
                 }
 
@@ -6868,7 +6960,8 @@ ${STATE.proposalRejectCount >= 4
                         hasConfirmedNight: false,
                         joinedAt: Date.now(),
                         isVirtual: false,
-                        deviceId: deviceId
+                        deviceId: deviceId,
+                        online: true // ✅ 新玩家在线
                     }
                 };
                 STATE.myUid = newUid;
@@ -6882,11 +6975,14 @@ ${STATE.proposalRejectCount >= 4
                         role: null,
                         hasConfirmedNight: false,
                         isVirtual: false,
-                        deviceId: deviceId
+                        deviceId: deviceId,
+                        online: true
                     }
                 };
                 localStorage.setItem('avalon_room_id', roomId);
                 localStorage.setItem('avalon_player_name', playerName);
+                const onlineRef = db.ref('rooms/' + roomId + '/players/' + newUid + '/online');
+                onlineRef.onDisconnect().set(false);
                 return roomRef.update(updates).then(() => ({ success: true, existing: false }));
             }).catch(err => ({ success: false, error: err.message }));
         }
@@ -6903,6 +6999,8 @@ ${STATE.proposalRejectCount >= 4
                 if (snap.val() === true) {
                     if (STATE.myUid && STATE.roomId) {
                         const userStatusRef = db.ref('rooms/' + STATE.roomId + '/players/' + STATE.myUid + '/online');
+                        // ✅ 先取消旧的 onDisconnect
+                        userStatusRef.onDisconnect().cancel();
                         userStatusRef.onDisconnect().set(false);
                         userStatusRef.set(true);
                     }
@@ -6919,6 +7017,10 @@ ${STATE.proposalRejectCount >= 4
                     showEnterPage();
                     // 重置状态
                     STATE.allPlayers = {};
+                    // 确保当前玩家在线（避免显示断线）
+                    if (STATE.myUid && STATE.allPlayers[STATE.myUid]) {
+                        STATE.allPlayers[STATE.myUid].online = true;
+                    }
                     STATE.gameStarted = false;
                     STATE.phase = 'lobby';
                     setStatus(roomStatusHint, '⏳ 房间已解散，等待房主创建...', 'info');
@@ -6929,6 +7031,64 @@ ${STATE.proposalRejectCount >= 4
                         if (adminViewInfo) adminViewInfo.classList.add('hidden');
                     }
                     return;
+                }
+
+                // ============================================================
+                // ✅ 自动清理断线玩家（仅管理员房主执行）
+                // ============================================================
+                const hostUid = data.host;
+                // 判断当前玩家是否是管理员且是房主（利用 STATE.isAdmin 和 uid 比较）
+                if (STATE.isAdmin && STATE.myUid === hostUid) {
+                    const players = data.players || {};
+                    const playerIds = Object.keys(players);
+                    let needClean = false;
+                    const updates = {};
+                    let hasRealPlayer = false;
+
+                    playerIds.forEach(uid => {
+                        const p = players[uid];
+                        // 如果是虚拟玩家，保留
+                        if (isVirtual(uid)) {
+                            hasRealPlayer = true; // 虚拟玩家也算存在，但不影响清理
+                            return;
+                        }
+                        // 如果是当前管理员自己，保留
+                        if (uid === STATE.myUid) {
+                            hasRealPlayer = true;
+                            return;
+                        }
+                        // 如果玩家在线标记为 false 或者没有 online 字段（说明可能已断线）
+                        if (p.online === false || p.online === undefined) {
+                            // 标记需要清理
+                            updates['players/' + uid] = null;
+                            needClean = true;
+                            console.log('清理断线玩家:', uid, p.name);
+                        } else {
+                            // 有在线的真人玩家，房间应该保留
+                            hasRealPlayer = true;
+                        }
+                    });
+
+                    // 如果清理后，房间内没有真人玩家（只剩下虚拟玩家或空），则销毁房间
+                    if (needClean) {
+                        // 先执行清理
+                        roomRef.update(updates).then(() => {
+                            // 再检查是否还有真人（包括自己）
+                            roomRef.once('value').then(snap => {
+                                const newData = snap.val();
+                                if (!newData) return;
+                                const remaining = Object.keys(newData.players || {});
+                                const realRemaining = remaining.filter(uid => !isVirtual(uid));
+                                if (realRemaining.length === 0) {
+                                    // 没有真人玩家了，销毁房间
+                                    roomRef.remove().then(() => {
+                                        console.log('房间已自动销毁（无真人玩家）');
+                                        showToast('房间已自动清理', 1500);
+                                    }).catch(err => console.warn('自动销毁房间失败:', err));
+                                }
+                            });
+                        }).catch(err => console.warn('清理断线玩家失败:', err));
+                    }
                 }
 
                 const currentPhase = data.phase || 'lobby';
@@ -7043,6 +7203,10 @@ ${STATE.proposalRejectCount >= 4
                 }
                 if (STATE.isAdmin) { renderAdminPlayerList(); renderVirtualAvatars(); }
                 updateViewIndicators();
+                // 如果当前是管理员，更新面板状态
+                if (STATE.isAdmin) {
+                    setStatus(adminRoomStatus, '✅ 已连接到房间: ' + STATE.roomId, 'success');
+                }
             });
         }
 
@@ -7550,22 +7714,49 @@ ${STATE.proposalRejectCount >= 4
                                 setStatus(roomStatusHint, '⏳ 等待房主创建房间...', 'info');
                             });
                         } else if (isHost) {
-                            // 房主离开，转移房主给其他人
+                            // 检查剩余玩家中是否有非虚拟玩家
                             const remaining = Object.keys(newData.players);
-                            const newHost = remaining[0];
-                            const roomRef2 = db.ref('rooms/' + STATE.roomId);
-                            return roomRef2.update({
-                                host: newHost,
-                                ['players/' + newHost + '/isHost']: true
-                            }).then(() => {
-                                STATE.roomId = null; STATE.myUid = null; STATE.isHost = false;
-                                STATE.allPlayers = {};
-                                STATE.roomExists = true; // 房间仍存在
-                                localStorage.removeItem('avalon_room_id');
-                                showEnterPage();
-                                showToast('你已退出，房主已转移', 1500);
-                                setStatus(roomStatusHint, '✅ 房间仍存在，可重新加入', 'success');
-                            });
+                            const realPlayers = remaining.filter(uid => !isVirtual(uid));
+
+                            if (realPlayers.length === 0) {
+                                // 只剩下虚拟玩家 → 直接销毁房间（使用 set(null) 并处理错误）
+                                const roomRef2 = db.ref('rooms/' + STATE.roomId);
+                                roomRef2.set(null).then(() => {
+                                    STATE.roomId = null; STATE.roomExists = false;
+                                    STATE.allPlayers = {}; STATE.myUid = null; STATE.isHost = false;
+                                    localStorage.removeItem('avalon_room_id');
+                                    showEnterPage();
+                                    showToast('房间已销毁（仅剩虚拟玩家）', 1500);
+                                    setStatus(roomStatusHint, '⏳ 等待房主创建房间...', 'info');
+                                }).catch(err => {
+                                    console.error('销毁房间失败:', err);
+                                    showToast('销毁房间失败，请手动清理或重试', 2000);
+                                    // 即使失败，仍然清理本地状态
+                                    STATE.roomId = null; STATE.roomExists = false;
+                                    STATE.allPlayers = {}; STATE.myUid = null; STATE.isHost = false;
+                                    localStorage.removeItem('avalon_room_id');
+                                    showEnterPage();
+                                    setStatus(roomStatusHint, '⚠️ 房间未完全清理，请手动删除', 'error');
+                                });
+                            } else {
+                                // 还有真人玩家 → 转移房主给第一个真人玩家
+                                const newHost = realPlayers[0];
+                                const roomRef2 = db.ref('rooms/' + STATE.roomId);
+                                roomRef2.update({
+                                    host: newHost,
+                                    ['players/' + newHost + '/isHost']: true
+                                }).then(() => {
+                                    STATE.roomId = null; STATE.myUid = null; STATE.isHost = false;
+                                    STATE.allPlayers = {};
+                                    STATE.roomExists = true;
+                                    localStorage.removeItem('avalon_room_id');
+                                    showEnterPage();
+                                    showToast('你已退出，房主已转移', 1500);
+                                    setStatus(roomStatusHint, '✅ 房间仍存在，可重新加入', 'success');
+                                }).catch(err => {
+                                    showToast('转移房主失败: ' + err.message, 2000);
+                                });
+                            }
                         } else {
                             // 非房主正常退出
                             STATE.roomId = null; STATE.myUid = null; STATE.isHost = false;
@@ -7810,6 +8001,8 @@ ${STATE.proposalRejectCount >= 4
             if (password !== 'avalon') { setStatus(adminLoginStatus, '❌ 密码错误', 'error'); return; }
             if (!name) { setStatus(adminLoginStatus, '请输入管理员名字', 'error'); return; }
             setStatus(adminLoginStatus, '✅ 登录成功', 'success');
+            // ✅ 保存管理员名字到 localStorage
+            localStorage.setItem('avalon_admin_name', name);
             STATE.isAdmin = true;
             STATE.adminUid = getAdminUid();
             adminNameDisplay.textContent = name;
@@ -7822,6 +8015,38 @@ ${STATE.proposalRejectCount >= 4
             adminToggleBtn.classList.add('visible');
 
             loadPresetPlayers();
+
+            // 删除房间
+            document.getElementById('adminCleanRoomsBtn')?.addEventListener('click', function () {
+                if (!confirm('将删除所有没有真人玩家的空房间，确定吗？')) return;
+                db.ref('rooms').once('value').then(snapshot => {
+                    const rooms = snapshot.val();
+                    if (!rooms) { showToast('没有房间', 1500); return; }
+                    let count = 0;
+                    const promises = [];
+                    Object.keys(rooms).forEach(roomId => {
+                        const room = rooms[roomId];
+                        if (!room.players) return;
+                        const players = room.players;
+                        const hasReal = Object.keys(players).some(uid => !isVirtual(uid) && players[uid].online !== false);
+                        if (!hasReal) {
+                            count++;
+                            promises.push(db.ref('rooms/' + roomId).set(null));
+                        }
+                    });
+                    if (promises.length === 0) {
+                        showToast('没有需要清理的空房间', 1500);
+                        return;
+                    }
+                    Promise.all(promises).then(() => {
+                        showToast(`已清理 ${count} 个空房间`, 2000);
+                        // 清理成功后刷新当前房间状态
+                        checkRoomExists().then(() => refreshAllUI());
+                    }).catch(err => {
+                        showToast('清理失败: ' + err.message, 2000);
+                    });
+                });
+            });
 
             // 创建一键任务成功或失败按钮
             document.getElementById('adminQuickSuccessBtn')?.addEventListener('click', window.adminQuickMissionSuccess);
@@ -7990,6 +8215,18 @@ ${STATE.proposalRejectCount >= 4
         });
 
         adminCreateRoomBtn.addEventListener('click', function () {
+            // ✅ 获取名字：优先使用输入框，为空则从 localStorage 读取
+            let name = adminName.value.trim();
+            if (!name) {
+                name = localStorage.getItem('avalon_admin_name');
+            }
+            // 最终兜底（理论上不会触发，因为登录时已保存）
+            if (!name) {
+                name = '管理员';
+                // 同时也保存一下，防止下次还为空
+                localStorage.setItem('avalon_admin_name', name);
+            }
+
             // ✅ 新增：检查是否已有房间
             checkRoomExists().then(result => {
                 if (result.exists) {
@@ -8009,7 +8246,7 @@ ${STATE.proposalRejectCount >= 4
                     }
                     // 如果管理员不在该房间，加入
                     if (!STATE.allPlayers[STATE.adminUid] && STATE.adminUid) {
-                        joinRoom(result.roomId, adminName.value.trim() || '管理员', STATE.adminUid).then(joinResult => {
+                        joinRoom(result.roomId, name, STATE.adminUid).then(joinResult => {
                             if (joinResult.success) {
                                 if (!joinResult.existing) {
                                     const roomRef = db.ref('rooms/' + STATE.roomId);
@@ -8061,8 +8298,8 @@ ${STATE.proposalRejectCount >= 4
                     updateDefaultRolesDisplay(defaultCount);
                     initCustomRoleCheckboxes();
                     document.getElementById('ruleModalConfirm').textContent = '✅ 确定创建';
-                    modal.classList.add('show');
-                    // 自定义板子初始化时，忠臣和爪牙数量应为 0（因为默认不勾选忠臣和爪牙）
+                    showModal(modal);
+                    // 自定义板子初始化时，忠臣和爪牙数量应为 0
                     document.getElementById('ruleLoyalCount').value = 0;
                     document.getElementById('ruleMinionCount').value = 0;
                 }
@@ -8080,6 +8317,7 @@ ${STATE.proposalRejectCount >= 4
                 checkRoomExists().then(result => {
                     if (result.exists) {
                         STATE.roomId = result.roomId; STATE.roomExists = true;
+                        STATE.roomId = result.roomId; STATE.roomExists = true;
                         listenRoom(STATE.roomId);
                         renderAdminPlayerList(); renderVirtualAvatars(); refreshAllUI();
                         showToast('🔄 已连接到房间', 1000);
@@ -8094,30 +8332,46 @@ ${STATE.proposalRejectCount >= 4
                 return;
             }
             if (confirm('⚠️ 确定要解散房间吗？所有玩家将被踢出，数据将永久删除！')) {
-                // 二次确认
                 if (!confirm('再次确认：真的要解散房间吗？')) return;
 
                 const roomRef = db.ref('rooms/' + STATE.roomId);
-                roomRef.remove().then(() => {
-                    showToast('房间已解散', 2000);
-                    STATE.roomId = null;
-                    STATE.roomExists = false;
-                    STATE.allPlayers = {};
-                    STATE.myUid = null;
-                    STATE.isHost = false;
-                    STATE.gameStarted = false;
-                    STATE.phase = 'lobby';
-                    // 清除本地存储的房间ID，但保留玩家名字
-                    localStorage.removeItem('avalon_room_id');
-                    // 不删除玩家名字，方便下次创建
-                    showEnterPage();
-                    setStatus(roomStatusHint, '⏳ 房间已解散，等待房主创建...', 'info');
-                    adminPanel.classList.remove('show');
-                    adminToggleBtn.classList.remove('active');
-                    if (STATE.isAdmin) { renderAdminPlayerList(); renderVirtualAvatars(); }
-                    // 刷新所有UI
-                    refreshAllUI();
-                }).catch(err => showToast('解散失败: ' + err.message, 2000));
+
+                // ✅ 先取消自己的 onDisconnect，避免断线后重新写入数据
+                if (STATE.myUid) {
+                    const statusRef = db.ref('rooms/' + STATE.roomId + '/players/' + STATE.myUid + '/online');
+                    statusRef.onDisconnect().cancel();
+                }
+
+                roomRef.remove()
+                    .then(() => {
+                        showToast('房间已解散', 2000);
+                        // 清理本地状态
+                        STATE.roomId = null;
+                        STATE.roomExists = false;
+                        STATE.allPlayers = {};
+                        STATE.myUid = null;
+                        STATE.isHost = false;
+                        STATE.gameStarted = false;
+                        STATE.phase = 'lobby';
+                        localStorage.removeItem('avalon_room_id');
+                        showEnterPage();
+                        setStatus(roomStatusHint, '⏳ 房间已解散，等待房主创建...', 'info');
+                        adminPanel.classList.remove('show');
+                        adminToggleBtn.classList.remove('active');
+                        refreshAllUI();
+                    })
+                    .catch(err => {
+                        console.error('解散房间失败:', err);
+                        showToast('解散失败: ' + err.message + '，请重试或手动清理', 3000);
+                        // 即使失败，也尝试清理本地状态，让用户可以重新创建
+                        STATE.roomId = null;
+                        STATE.roomExists = false;
+                        STATE.myUid = null;
+                        localStorage.removeItem('avalon_room_id');
+                        showEnterPage();
+                        setStatus(roomStatusHint, '⚠️ 房间未完全删除，请重试', 'error');
+                        refreshAllUI();
+                    });
             }
         });
 
@@ -8442,16 +8696,17 @@ ${STATE.proposalRejectCount >= 4
         });
 
         // ============================================================
-        // 双击版本号显示管理员按钮
+        // 双击任意页面的标题（H1）显示管理员按钮（所有页面通用）
         // ============================================================
-        const versionEl = document.getElementById('appVersion');
-        if (versionEl) {
-            versionEl.addEventListener('dblclick', function (e) {
+        document.addEventListener('dblclick', function (e) {
+            const target = e.target.closest('h1');
+            if (target) {
                 const btn = adminToggleBtn;
                 btn.classList.toggle('visible');
                 showToast(btn.classList.contains('visible') ? '🔑 管理员按钮已显示' : '管理员按钮已隐藏', 1000);
-            });
-        }
+                e.stopPropagation(); // 防止冒泡到其他双击事件
+            }
+        });
 
         // ============================================================
         // 强制隐藏管理员按钮（每次刷新默认隐藏）

@@ -2928,17 +2928,19 @@
             }
         }
 
-        // 在 renderLobby 函数外部定义一个缓存变量（放在文件顶部附近，与 toastTimer 等并列）
+        // 用于缓存卡片映射（首次渲染后保存）
+        let lobbyCardMap = {};
+
         function renderLobby() {
             const players = STATE.allPlayers;
             const playerIds = Object.keys(players);
             const effectiveUid = getEffectiveUid();
             const effectivePlayer = getEffectivePlayer();
 
-            // 更新人数角标（这个始终需要更新）
+            // 更新人数角标
             playerCountBadge.textContent = playerIds.length + ' 人';
 
-            // 构建当前状态键（包含每个玩家的关键属性）
+            // 构建当前状态键（用于判断是否变化）
             const stateKey = playerIds
                 .sort()
                 .map(uid => {
@@ -2947,9 +2949,9 @@
                 })
                 .join(';');
 
-            // 如果状态未变，且之前渲染过网格，则直接跳过重绘（但需更新准备按钮状态）
+            // 如果状态未变，且之前渲染过网格，则只更新准备按钮和房主状态，不碰卡片
             if (stateKey === lastLobbyState && document.querySelector('.player-grid')) {
-                // 仍然需要更新准备按钮状态，因为玩家自身可能变化
+                // 更新准备按钮
                 if (effectivePlayer) {
                     const isReady = effectivePlayer.isReady || false;
                     readyBtn.textContent = isReady ? '❌ 取消准备' : '✅ 准备';
@@ -2958,21 +2960,101 @@
                     readyBtn.textContent = '✅ 准备';
                     readyBtn.disabled = true;
                 }
-                // 更新房主按钮状态
                 updateHostActions();
-                // 更新房间信息
                 lobbyRoomInfo.textContent = '房间: ' + STATE.roomId + ' · ' + playerIds.length + ' 人';
-                // 更新规则显示
                 updateLobbyRuleDisplay();
-                updateViewIndicators(); // ✅ 添加这一行
+                updateViewIndicators();
                 return;
             }
 
-            // 状态变化，更新缓存并执行全量渲染
+            // 状态变化，更新缓存并执行更新
             lastLobbyState = stateKey;
 
-            // ----- 全量生成玩家网格 -----
             const container = playerListContainer;
+            const existingGrid = container.querySelector('.player-grid');
+
+            // 如果网格存在且玩家数量不变，则局部更新卡片内容
+            if (existingGrid) {
+                const currentCards = existingGrid.querySelectorAll('.player-card');
+                // 检查玩家数量是否一致
+                if (currentCards.length === playerIds.length) {
+                    // 遍历现有卡片，更新数据
+                    currentCards.forEach(card => {
+                        const uid = card.dataset.uid;
+                        if (!uid) return;
+                        const p = players[uid];
+                        if (!p) {
+                            // 玩家已离开，移除卡片（但不常见，因为数量相同）
+                            card.remove();
+                            return;
+                        }
+                        // 更新头像
+                        const avatarImg = card.querySelector('.avatar img');
+                        if (avatarImg) {
+                            const newAvatar = getAvatarUrl(p.name, p.name);
+                            if (avatarImg.src !== newAvatar) {
+                                avatarImg.src = newAvatar;
+                                avatarImg.onerror = function () {
+                                    avatarErrorHandler(this, uid, p.name);
+                                };
+                            }
+                        }
+                        // 更新名字
+                        const nameSpan = card.querySelector('.name');
+                        if (nameSpan) {
+                            const isMe = uid === effectiveUid;
+                            nameSpan.textContent = p.name + (isMe ? ' (你)' : '');
+                        }
+                        // 更新徽章
+                        const badgesDiv = card.querySelector('.badges');
+                        if (badgesDiv) {
+                            let badgeHtml = '';
+                            if (p.isHost) badgeHtml += '<span class="host-badge">房主</span>';
+                            if (isVirtual(uid)) badgeHtml += '<span class="virtual-badge">🧪</span>';
+                            if (p.online === false && uid !== effectiveUid) badgeHtml += '<span class="offline-badge">⚠️ 断线</span>';
+                            badgesDiv.innerHTML = badgeHtml;
+                        }
+                        // 更新状态点
+                        const dot = card.querySelector('.status-dot');
+                        if (dot) {
+                            dot.className = 'status-dot ' + (p.isReady ? 'ready' : 'not-ready');
+                        }
+                        // 更新踢人按钮（仅管理员可见）
+                        const kickBtn = card.querySelector('.kick-btn');
+                        const showKick = STATE.isAdmin && effectiveUid === STATE.myUid && uid !== effectiveUid;
+                        if (showKick && !kickBtn) {
+                            // 需要添加踢人按钮
+                            const btn = document.createElement('button');
+                            btn.className = 'kick-btn';
+                            btn.textContent = '✕';
+                            btn.onclick = function () { kickPlayer(uid); };
+                            card.appendChild(btn);
+                        } else if (!showKick && kickBtn) {
+                            kickBtn.remove();
+                        }
+                        // 更新离线类
+                        const isOffline = (p.online === false && uid !== effectiveUid);
+                        card.classList.toggle('offline', isOffline);
+                    });
+                    // 更新准备按钮和房主状态
+                    if (effectivePlayer) {
+                        const isReady = effectivePlayer.isReady || false;
+                        readyBtn.textContent = isReady ? '❌ 取消准备' : '✅ 准备';
+                        readyBtn.disabled = false;
+                    } else {
+                        readyBtn.textContent = '✅ 准备';
+                        readyBtn.disabled = true;
+                    }
+                    updateHostActions();
+                    lobbyRoomInfo.textContent = '房间: ' + STATE.roomId + ' · ' + playerIds.length + ' 人';
+                    updateLobbyRuleDisplay();
+                    updateViewIndicators();
+                    return;
+                }
+                // 如果玩家数量变化，则退回到全量重建（下面会执行）
+            }
+
+            // 全量生成玩家网格（首次渲染或数量变化时）
             if (playerIds.length === 0) {
                 container.innerHTML = '<div class="empty-state">暂无玩家</div>';
             } else {
@@ -3004,7 +3086,7 @@
                 container.innerHTML = html;
             }
 
-            // 更新准备按钮状态
+            // 更新准备按钮
             if (effectivePlayer) {
                 const isReady = effectivePlayer.isReady || false;
                 readyBtn.textContent = isReady ? '❌ 取消准备' : '✅ 准备';
@@ -3014,16 +3096,9 @@
                 readyBtn.disabled = true;
             }
 
-            // 更新房主控制区域
             updateHostActions();
-
-            // 更新房间信息
             lobbyRoomInfo.textContent = '房间: ' + STATE.roomId + ' · ' + playerIds.length + ' 人';
-
-            // 更新规则显示
             updateLobbyRuleDisplay();
-
-            // 视角指示器
             updateViewIndicators();
         }
 

@@ -1266,6 +1266,135 @@
         .room-rule-info strong {
             color: #f0a500;
         }
+
+        /* ===== UI 动画过渡 ===== */
+
+        /* 页面容器（所有页面） */
+        #enterPage,
+        #lobbyPage,
+        #selectRolePage,
+        #nightPage,
+        #dayMissionPage,
+        #electLeaderPage,
+        #assassinationPage,
+        #gameOverPage {
+            transition: opacity 0.3s ease, transform 0.3s ease;
+            opacity: 0;
+            transform: translateY(12px);
+            pointer-events: none;
+            /* 过渡期间不可交互 */
+            will-change: opacity, transform;
+        }
+
+        #enterPage.show,
+        #lobbyPage.show,
+        #selectRolePage.show,
+        #nightPage.show,
+        #dayMissionPage.show,
+        #electLeaderPage.show,
+        #assassinationPage.show,
+        #gameOverPage.show {
+            opacity: 1;
+            transform: translateY(0);
+            pointer-events: auto;
+        }
+
+        /* 模态框容器（所有模态框） */
+        #identityModal,
+        #roleInfoModal,
+        #gameRuleModal,
+        #ruleModal {
+            visibility: hidden;
+            opacity: 0;
+            transform: scale(0.92);
+            transition: visibility 0.25s, opacity 0.25s, transform 0.25s;
+            pointer-events: none;
+        }
+
+        #identityModal.show,
+        #roleInfoModal.show,
+        #gameRuleModal.show,
+        #ruleModal.show {
+            visibility: visible;
+            opacity: 1;
+            transform: scale(1);
+            pointer-events: auto;
+        }
+
+        /* 卡片入场动画（玩家卡片、竞选卡片等） */
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .player-card,
+        .avatar-item,
+        .preset-item {
+            opacity: 0;
+            animation: slideUp 0.3s ease forwards;
+        }
+
+        /* 预设玩家列表的 .preset-item 也应用 */
+
+        /* 按钮微交互 */
+        .btn:active {
+            transform: scale(0.97);
+            box-shadow: 0 0 0 2px rgba(240, 165, 0, 0.3);
+        }
+
+        /* 高亮当前车长（呼吸光效） */
+        @keyframes breathe {
+
+            0%,
+            100% {
+                box-shadow: 0 0 8px 2px rgba(240, 165, 0, 0.2);
+            }
+
+            50% {
+                box-shadow: 0 0 20px 6px rgba(240, 165, 0, 0.6);
+            }
+        }
+
+        .player-card.leader-highlight {
+            border-color: #f0a500;
+            animation: slideUp 0.3s ease forwards, breathe 1.5s infinite ease-in-out;
+        }
+
+        /* 未投票角标 */
+        .player-card .vote-pending {
+            position: absolute;
+            top: -6px;
+            right: -6px;
+            background: #f0a500;
+            color: #1a1a2e;
+            font-size: 10px;
+            font-weight: bold;
+            padding: 2px 8px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        }
+
+        /* 断线状态 */
+        .player-card.offline .avatar {
+            filter: grayscale(1);
+            opacity: 0.5;
+        }
+
+        .player-card .offline-badge {
+            font-size: 10px;
+            color: #ff6b6b;
+            background: #3a1a1a;
+            padding: 0 8px;
+            border-radius: 10px;
+            border: 1px solid #ff6b6b;
+        }
     </style>
 </head>
 
@@ -2389,6 +2518,51 @@
         }
 
         // ============================================================
+        // UI 动画辅助函数
+        // ============================================================
+
+        // 隐藏所有页面（移除 show 类，添加 hidden）
+        function hideAllPages() {
+            const pages = document.querySelectorAll('#enterPage, #lobbyPage, #selectRolePage, #nightPage, #dayMissionPage, #electLeaderPage, #assassinationPage, #gameOverPage');
+            pages.forEach(el => {
+                el.classList.remove('show');
+                el.classList.add('hidden');
+            });
+        }
+
+        // 显示指定页面（移除 hidden，添加 show）
+        function showPage(element) {
+            if (!element) return;
+            element.classList.remove('hidden');
+            // 强制重排以触发过渡
+            void element.offsetWidth;
+            element.classList.add('show');
+        }
+
+        // 显示模态框（传入元素ID或元素本身）
+        function showModal(element) {
+            const el = typeof element === 'string' ? document.getElementById(element) : element;
+            if (!el) return;
+            el.style.display = 'flex';   // 有些模态框用了 display:flex 来居中
+            // 强制重排
+            void el.offsetWidth;
+            el.classList.add('show');
+        }
+
+        // 隐藏模态框
+        function hideModal(element) {
+            const el = typeof element === 'string' ? document.getElementById(element) : element;
+            if (!el) return;
+            el.classList.remove('show');
+            // 等待过渡结束后隐藏，防止闪烁
+            setTimeout(() => {
+                if (!el.classList.contains('show')) {
+                    el.style.display = 'none';
+                }
+            }, 300);
+        }
+
+        // ============================================================
         // 模块 5：页面切换与视角指示器
         // ============================================================
         function getDayMissionPage() {
@@ -2399,90 +2573,63 @@
         }
 
         function showEnterPage() {
-            enterPage.classList.remove('hidden');
-            lobbyPage.classList.add('hidden');
-            selectRolePage.classList.add('hidden');
-            nightPage.classList.add('hidden');
-            const dmp = getDayMissionPage(); if (dmp) dmp.classList.add('hidden');
-            const elp = getElectLeaderPage(); if (elp) elp.classList.add('hidden');
-
-            // 👇 新增：隐藏结算页面和刺杀页面
+            hideAllPages();
+            showPage(enterPage);
+            // 额外隐藏特殊页面
             const gop = document.getElementById('gameOverPage'); if (gop) gop.classList.add('hidden');
             const ap = document.getElementById('assassinationPage'); if (ap) ap.classList.add('hidden');
         }
+
         function showLobbyPage() {
-            enterPage.classList.add('hidden');
-            lobbyPage.classList.remove('hidden');
-            selectRolePage.classList.add('hidden');
-            nightPage.classList.add('hidden');
-            const dmp = getDayMissionPage(); if (dmp) dmp.classList.add('hidden');
-            const elp = getElectLeaderPage(); if (elp) elp.classList.add('hidden');
-
-            // 👇 新增：隐藏结算页面和刺杀页面
+            hideAllPages();
+            showPage(lobbyPage);
             const gop = document.getElementById('gameOverPage'); if (gop) gop.classList.add('hidden');
             const ap = document.getElementById('assassinationPage'); if (ap) ap.classList.add('hidden');
         }
+
         function showSelectRolePage() {
-            enterPage.classList.add('hidden');
-            lobbyPage.classList.add('hidden');
-            selectRolePage.classList.remove('hidden');
-            nightPage.classList.add('hidden');
-            const dmp = getDayMissionPage(); if (dmp) dmp.classList.add('hidden');
-            const elp = getElectLeaderPage(); if (elp) elp.classList.add('hidden');
-
-            // 👇 新增：隐藏结算页面和刺杀页面
+            hideAllPages();
+            showPage(selectRolePage);
             const gop = document.getElementById('gameOverPage'); if (gop) gop.classList.add('hidden');
             const ap = document.getElementById('assassinationPage'); if (ap) ap.classList.add('hidden');
         }
+
         function showNightPage() {
-            enterPage.classList.add('hidden');
-            lobbyPage.classList.add('hidden');
-            selectRolePage.classList.add('hidden');
-            nightPage.classList.remove('hidden');
-            const dmp = getDayMissionPage(); if (dmp) dmp.classList.add('hidden');
-            const elp = getElectLeaderPage(); if (elp) elp.classList.add('hidden');
-
-            // 👇 新增：隐藏结算页面和刺杀页面
+            hideAllPages();
+            showPage(nightPage);
             const gop = document.getElementById('gameOverPage'); if (gop) gop.classList.add('hidden');
             const ap = document.getElementById('assassinationPage'); if (ap) ap.classList.add('hidden');
         }
+
         function showElectLeaderPage() {
-            enterPage.classList.add('hidden');
-            lobbyPage.classList.add('hidden');
-            selectRolePage.classList.add('hidden');
-            nightPage.classList.add('hidden');
-            const dmp = getDayMissionPage(); if (dmp) dmp.classList.add('hidden');
+            hideAllPages();
             const elp = getElectLeaderPage();
-            if (elp) elp.classList.remove('hidden');
-
-            // 👇 新增：隐藏结算页面和刺杀页面
+            if (elp) showPage(elp);
             const gop = document.getElementById('gameOverPage'); if (gop) gop.classList.add('hidden');
             const ap = document.getElementById('assassinationPage'); if (ap) ap.classList.add('hidden');
         }
-        function showDayMissionPage() {
-            enterPage.classList.add('hidden');
-            lobbyPage.classList.add('hidden');
-            selectRolePage.classList.add('hidden');
-            nightPage.classList.add('hidden');
-            const dmp = getDayMissionPage();
-            if (dmp) dmp.classList.remove('hidden');
-            const elp = getElectLeaderPage(); if (elp) elp.classList.add('hidden');
 
-            // 👇 新增：隐藏结算页面和刺杀页面
+        function showDayMissionPage() {
+            hideAllPages();
+            const dmp = getDayMissionPage();
+            if (dmp) showPage(dmp);
+            const elp = getElectLeaderPage(); if (elp) elp.classList.add('hidden');
             const gop = document.getElementById('gameOverPage'); if (gop) gop.classList.add('hidden');
             const ap = document.getElementById('assassinationPage'); if (ap) ap.classList.add('hidden');
         }
 
         function showGameOverPage() {
-            enterPage.classList.add('hidden');
-            lobbyPage.classList.add('hidden');
-            selectRolePage.classList.add('hidden');
-            nightPage.classList.add('hidden');
-            const dmp = getDayMissionPage(); if (dmp) dmp.classList.add('hidden');
-            const elp = getElectLeaderPage(); if (elp) elp.classList.add('hidden');
-            const ap = document.getElementById('assassinationPage'); if (ap) ap.classList.add('hidden');
+            hideAllPages();
             const gop = document.getElementById('gameOverPage');
-            if (gop) gop.classList.remove('hidden');
+            if (gop) showPage(gop);
+            const ap = document.getElementById('assassinationPage'); if (ap) ap.classList.add('hidden');
+        }
+
+        function showAssassinationPage() {
+            hideAllPages();
+            const as = document.getElementById('assassinationPage');
+            if (as) showPage(as);
+            const gop = document.getElementById('gameOverPage'); if (gop) gop.classList.add('hidden');
         }
 
         function renderGameOver() {
@@ -2522,18 +2669,6 @@
             updateViewIndicators();
         }
 
-        function showAssassinationPage() {
-            enterPage.classList.add('hidden');
-            lobbyPage.classList.add('hidden');
-            selectRolePage.classList.add('hidden');
-            nightPage.classList.add('hidden');
-            const dmp = getDayMissionPage(); if (dmp) dmp.classList.add('hidden');
-            const elp = getElectLeaderPage(); if (elp) elp.classList.add('hidden');
-            const as = document.getElementById('assassinationPage');
-            const gop = document.getElementById('gameOverPage'); if (gop) gop.classList.add('hidden');
-            if (as) as.classList.remove('hidden');
-        }
-
         function renderAssassination() {
             const targetsDiv = document.getElementById('assassinationTargets');
             const statusDiv = document.getElementById('assassinationStatus');
@@ -2546,12 +2681,10 @@
             const done = STATE.assassinationDone || false;
             const selectedTarget = STATE.assassinationSelectedTarget || null;
 
-            // 移除旧的确认区域（每次渲染时清理）
             const oldArea = document.getElementById('assassinationConfirmArea');
             if (oldArea) oldArea.remove();
 
             if (done) {
-                // 已刺杀，显示结果
                 const targetUid = STATE.assassinationTarget;
                 const targetName = allPlayers[targetUid]?.name || '未知';
                 const isMerlin = allPlayers[targetUid]?.role === '梅林';
@@ -2570,7 +2703,6 @@
                 return;
             }
 
-            // 判断当前玩家是否是刺客
             if (effectiveUid !== assassinUid) {
                 subtitle.textContent = '⏳ 等待刺客选择目标...';
                 targetsDiv.innerHTML = '<div style="color:#667788;">你不是刺客，请等待...</div>';
@@ -2579,51 +2711,45 @@
                 return;
             }
 
-            // ---------- 刺客界面（只有刺客能看到） ----------
             subtitle.textContent = '🗡️ 你是刺客，请选择你认为的梅林';
             const playerIds = Object.keys(allPlayers);
             let html = '';
             let selectedName = '';
 
-            playerIds.forEach(uid => {
-                if (uid === effectiveUid) return; // 不显示自己
+            playerIds.forEach((uid, index) => {
+                if (uid === effectiveUid) return;
 
                 const p = allPlayers[uid];
                 const role = p.role;
                 const isBad = role && ['莫甘娜', '刺客', '莫德雷德', '奥伯伦', '爪牙'].includes(role);
                 const isSelected = (uid === selectedTarget);
-                // ✅ 定义远程和本地头像地址
                 const remoteUrl = getAvatarUrl(p.name, p.name);
+                const delay = index * 0.05;
 
                 if (isBad) {
-                    // 坏人同伴：显示但不可点击
-                    html += `<div class="player-card" style="cursor:not-allowed;opacity:0.6;border-color:#2a3a5a;">
-    <span class="avatar"><img src="${remoteUrl}" alt="${escapeHtml(p.name)}" onerror="avatarErrorHandler(this, '${uid}', ${JSON.stringify(p.name)})"></span>
-            <span class="name">${escapeHtml(p.name)}</span>
-            <div style="font-size:12px;color:#ff6b6b;">👥 同伴（不可选）</div>
-        </div>`;
+                    html += `<div class="player-card" style="cursor:not-allowed;opacity:0.6;border-color:#2a3a5a; animation-delay: ${delay}s;">
+                <span class="avatar"><img src="${remoteUrl}" alt="${escapeHtml(p.name)}" onerror="avatarErrorHandler(this, '${uid}', ${JSON.stringify(p.name)})"></span>
+                <span class="name">${escapeHtml(p.name)}</span>
+                <div style="font-size:12px;color:#ff6b6b;">👥 同伴（不可选）</div>
+            </div>`;
                 } else {
-                    // 好人玩家：显示可点击
                     const borderColor = isSelected ? '#f0a500' : '#2a3a5a';
                     const shadow = isSelected ? '0 0 20px rgba(240,165,0,0.5)' : 'none';
-                    html += `<div class="player-card" style="cursor:pointer;border-color:${borderColor};box-shadow:${shadow};transition:all 0.3s;" onclick="selectAssassinationTarget('${uid}')">
-            <span class="avatar"><img src="${remoteUrl}" alt="${escapeHtml(p.name)}" onerror="avatarErrorHandler(this, '${uid}', ${JSON.stringify(p.name)})"></span>
-            <span class="name">${escapeHtml(p.name)}</span>
-            <div style="font-size:12px;color:#667788;">👤 ？？？</div>
-            ${isSelected ? '<div style="font-size:14px;color:#f0a500;font-weight:bold;">✅ 已选中</div>' : ''}
-        </div>`;
+                    html += `<div class="player-card" style="cursor:pointer;border-color:${borderColor};box-shadow:${shadow};transition:all 0.3s; animation-delay: ${delay}s;" onclick="selectAssassinationTarget('${uid}')">
+                <span class="avatar"><img src="${remoteUrl}" alt="${escapeHtml(p.name)}" onerror="avatarErrorHandler(this, '${uid}', ${JSON.stringify(p.name)})"></span>
+                <span class="name">${escapeHtml(p.name)}</span>
+                <div style="font-size:12px;color:#667788;">👤 ？？？</div>
+                ${isSelected ? '<div style="font-size:14px;color:#f0a500;font-weight:bold;">✅ 已选中</div>' : ''}
+            </div>`;
                     if (isSelected) selectedName = p.name;
                 }
             });
 
-            // ✅ 关键修改：强制每行3列，使用 grid 布局
             targetsDiv.innerHTML = `<div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 8px;">${html}</div>`;
             statusDiv.className = 'status-msg';
             statusDiv.textContent = '';
 
-            // ---------- 显示“确定”按钮（只有刺客能看到，且选中目标时） ----------
             if (selectedTarget && effectiveUid === assassinUid) {
-                // 创建确认区域
                 const actionArea = document.createElement('div');
                 actionArea.id = 'assassinationConfirmArea';
                 actionArea.style.cssText = 'margin-top:16px;text-align:center;';
@@ -2642,7 +2768,6 @@
         `;
                 targetsDiv.parentNode.insertBefore(actionArea, targetsDiv.nextSibling);
 
-                // 绑定确认按钮事件
                 document.getElementById('confirmAssassinateBtn')?.addEventListener('click', function () {
                     if (STATE.assassinationDone) return;
                     if (!STATE.assassinationSelectedTarget) {
@@ -2652,7 +2777,6 @@
                     assassinate(STATE.assassinationSelectedTarget);
                 });
 
-                // 绑定取消按钮事件
                 document.getElementById('cancelAssassinateBtn')?.addEventListener('click', function () {
                     STATE.assassinationSelectedTarget = null;
                     renderAssassination();
@@ -2715,25 +2839,28 @@
                 playerListContainer.innerHTML = '<div class="empty-state">暂无玩家</div>';
             } else {
                 let html = '<div class="player-grid">';
-                playerIds.forEach(uid => {
+                playerIds.forEach((uid, index) => {
                     const p = players[uid];
                     const isMe = uid === effectiveUid;
                     const isReady = p.isReady || false;
                     const isHost = p.isHost || false;
                     const isVirtualPlayer = isVirtual(uid);
-                    const avatar = getAvatarUrl(p.name, p.name);    // 原来 DiceBear 的 URL
-                    // 踢出按钮：仅当管理员且当前视角为自己时显示（不能踢自己）
+                    const isOffline = (p.online === false);
+                    const avatar = getAvatarUrl(p.name, p.name);
                     const showKick = STATE.isAdmin && effectiveUid === STATE.myUid && uid !== effectiveUid;
-                    html += `<div class="player-card">
-    <span class="avatar"><img src="${avatar}" alt="${escapeHtml(p.name)}" onerror="avatarErrorHandler(this, '${uid}', ${JSON.stringify(p.name)})"></span>
-    <span class="name">${escapeHtml(p.name)}${isMe ? ' (你)' : ''}</span>
-    <div class="badges">
-        ${isHost ? '<span class="host-badge">房主</span>' : ''}
-        ${isVirtualPlayer ? '<span class="virtual-badge">🧪</span>' : ''}
-    </div>
-    <span class="status-dot ${isReady ? 'ready' : 'not-ready'}"></span>
-    ${showKick ? `<button class="kick-btn" onclick="kickPlayer('${uid}')">✕</button>` : ''}
-</div>`;
+                    const delay = index * 0.05;
+                    const offlineClass = isOffline ? ' offline' : '';
+                    html += `<div class="player-card${offlineClass}" style="animation-delay: ${delay}s;">
+        <span class="avatar"><img src="${avatar}" alt="${escapeHtml(p.name)}" onerror="avatarErrorHandler(this, '${uid}', ${JSON.stringify(p.name)})"></span>
+        <span class="name">${escapeHtml(p.name)}${isMe ? ' (你)' : ''}</span>
+        <div class="badges">
+            ${isHost ? '<span class="host-badge">房主</span>' : ''}
+            ${isVirtualPlayer ? '<span class="virtual-badge">🧪</span>' : ''}
+            ${isOffline ? '<span class="offline-badge">⚠️ 断线</span>' : ''}
+        </div>
+        <span class="status-dot ${isReady ? 'ready' : 'not-ready'}"></span>
+        ${showKick ? `<button class="kick-btn" onclick="kickPlayer('${uid}')">✕</button>` : ''}
+    </div>`;
                 });
                 html += '</div>';
                 playerListContainer.innerHTML = html;
@@ -4925,10 +5052,11 @@
                     html += '<span style="color:#667788;">暂无</span>';
                 } else {
                     html += '<div class="player-grid" style="grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));">';
-                    campaigners.forEach(uid => {
+                    campaigners.forEach((uid, index) => {
                         const p = allPlayers[uid];
                         const remoteUrl = getAvatarUrl(p.name, p.name);
-                        html += `<div class="player-card" style="padding:8px;">
+                        const delay = index * 0.05;
+                        html += `<div class="player-card" style="padding:8px; animation-delay: ${delay}s;">
                         <span class="avatar" style="width:48px;height:48px;"><img src="${remoteUrl}" alt="${escapeHtml(p.name)}" onerror="avatarErrorHandler(this, '${uid}', ${JSON.stringify(p.name)})"></span>
                         <span class="name" style="font-size:13px;">${escapeHtml(p.name)}</span>
                     </div>`;
@@ -5012,13 +5140,14 @@
                 const votedPlayers = Object.keys(electVotes);
 
                 let html = '<div class="elect-candidate-grid">';
-                candidates.forEach(uid => {
+                candidates.forEach((uid, index) => {
                     const p = allPlayers[uid];
                     const voteCount = Object.values(electVotes).filter(cuid => cuid === uid).length;
                     const voters = Object.keys(electVotes).filter(v => electVotes[v] === uid).map(v => allPlayers[v]?.name || '未知');
                     const canVote = !candidateSet.has(effectiveUid) && !votedPlayers.includes(effectiveUid) && effectiveUid !== uid;
                     const remoteUrl = getAvatarUrl(p.name, p.name);
-                    html += `<div class="player-card" style="padding:12px 8px;">
+                    const delay = index * 0.05;
+                    html += `<div class="player-card" style="padding:12px 8px; animation-delay: ${delay}s;">
         <span class="avatar"><img src="${remoteUrl}" alt="${escapeHtml(p.name)}" onerror="avatarErrorHandler(this, '${uid}', ${JSON.stringify(p.name)})"></span>
         <span class="name">${escapeHtml(p.name)}</span>
         <div style="font-size:14px;color:#f0a500;margin-top:4px;">${voteCount} 票</div>
@@ -5329,23 +5458,23 @@ ${STATE.proposalRejectCount >= 4
 
                     teamHtml += `<div style="font-size:16px;color:#f0a500;margin-bottom:10px;">点击玩家卡片选择任务队员</div>`;
                     teamHtml += '<div class="player-grid" id="missionSelectGrid">';
-                    playerIds.forEach(uid => {
+                    playerIds.forEach((uid, index) => {
                         const p = allPlayers[uid];
                         const isSelected = STATE.missionTeam.includes(uid);
                         const isSelf = (uid === effectiveUid);
                         const isFull = STATE.missionTeam.length >= config.players;
-                        // 如果已满员且该玩家未被选中，则显示为不可点击样式
                         const disabledStyle = (!isSelected && isFull) ? 'opacity:0.5;cursor:not-allowed;' : 'cursor:pointer;';
                         const borderColor = isSelected ? '#f0a500' : (isFull ? '#3a4a5a' : '#2a3a5a');
-
-                        // 在循环内（playerIds.forEach 或类似）添加两行
                         const remoteUrl = getAvatarUrl(p.name, p.name);
+                        const delay = index * 0.05;
+                        const isLeaderHighlight = (uid === currentLeaderUid);
+                        const leaderClass = isLeaderHighlight ? ' leader-highlight' : '';
 
-                        teamHtml += `<div class="player-card" style="border-color:${borderColor};${disabledStyle}" onclick="${(!isSelected && isFull) ? '' : `toggleMissionMember('${uid}')`}">
-    <span class="avatar"><img src="${remoteUrl}" alt="${escapeHtml(p.name)}" onerror="avatarErrorHandler(this, '${uid}', ${JSON.stringify(p.name)})"></span>
-    <span class="name">${escapeHtml(p.name)} ${isSelf ? '(你)' : ''}</span>
-    ${isSelected ? '<div style="font-size:20px;color:#f0a500;">✅</div>' : (isFull ? '<div style="font-size:12px;color:#667788;">🔒</div>' : '')}
-</div>`;
+                        teamHtml += `<div class="player-card${leaderClass}" style="border-color:${borderColor};${disabledStyle} animation-delay: ${delay}s;" onclick="${(!isSelected && isFull) ? '' : `toggleMissionMember('${uid}')`}">
+        <span class="avatar"><img src="${remoteUrl}" alt="${escapeHtml(p.name)}" onerror="avatarErrorHandler(this, '${uid}', ${JSON.stringify(p.name)})"></span>
+        <span class="name">${escapeHtml(p.name)} ${isSelf ? '(你)' : ''}</span>
+        ${isSelected ? '<div style="font-size:20px;color:#f0a500;">✅</div>' : (isFull ? '<div style="font-size:12px;color:#667788;">🔒</div>' : '')}
+    </div>`;
                     });
                     teamHtml += '</div>';
                     const canConfirm = STATE.missionTeam.length === config.players;
@@ -6147,12 +6276,10 @@ ${STATE.proposalRejectCount >= 4
             const modal = document.getElementById('ruleModal');
             if (!modal) return;
 
-            // 填充当前规则
             const currentRule = STATE.rule || { playerCount: 5, roles: DEFAULT_ROLES_BY_PLAYER[5] };
             const count = currentRule.playerCount || 5;
             const roles = currentRule.roles || [];
 
-            // 统计忠臣和爪牙数量
             const loyalCount = roles.filter(r => r === '忠臣').length;
             const minionCount = roles.filter(r => r === '爪牙').length;
             document.getElementById('ruleLoyalCount').value = loyalCount;
@@ -6161,15 +6288,12 @@ ${STATE.proposalRejectCount >= 4
             document.getElementById('rulePlayerCount').value = count;
             document.getElementById('rulePlayerCountDisplay').textContent = count;
 
-            // ✅ 关键：生成基础角色复选框（无论哪个 tab）
             updateRuleRoleCheckboxes(count);
 
-            // 判断当前规则是否与默认板子相同，决定显示哪个 tab
             const defaultRoles = DEFAULT_ROLES_BY_PLAYER[count] || [];
             const isDefault = (roles.length === defaultRoles.length && roles.every(r => defaultRoles.includes(r)));
             if (isDefault) {
                 currentRuleTab = 'default';
-                // 设置默认板子样式
                 document.getElementById('ruleTabDefault').style.background = '#f0a500';
                 document.getElementById('ruleTabDefault').style.color = '#1a1a2e';
                 document.getElementById('ruleTabDefault').style.border = '2px solid #f0a500';
@@ -6189,7 +6313,6 @@ ${STATE.proposalRejectCount >= 4
                 document.getElementById('ruleTabDefault').style.border = 'none';
                 document.getElementById('ruleDefaultContent').classList.add('hidden');
                 document.getElementById('ruleCustomContent').classList.remove('hidden');
-                // 更新复选框状态（只针对基础角色）
                 const baseRoles = roles.filter(r => r !== '忠臣' && r !== '爪牙');
                 const checkboxes = document.querySelectorAll('#ruleRoleCheckboxes input[type="checkbox"]');
                 checkboxes.forEach(cb => {
@@ -6197,9 +6320,8 @@ ${STATE.proposalRejectCount >= 4
                 });
             }
 
-            // 修改确认按钮文字
             document.getElementById('ruleModalConfirm').textContent = '💾 更新配置';
-            modal.classList.add('show');
+            showModal(modal);
         }
 
         //更新房间规则
@@ -6234,10 +6356,6 @@ ${STATE.proposalRejectCount >= 4
         // ============================================================
         // 模块 9：管理员面板渲染
         // ============================================================
-        function renderAdminPlayerList() {
-            // 已删除管理员面板中的玩家列表，此函数保留空以兼容调用
-        }
-
         function renderVirtualAvatars() {
             const container = virtualAvatarList;
             const virtuals = Object.keys(STATE.allPlayers).filter(uid => isVirtual(uid));
@@ -6249,26 +6367,27 @@ ${STATE.proposalRejectCount >= 4
                 const me = STATE.allPlayers[STATE.myUid];
                 const remoteUrl = getAvatarUrl(me.name, me.name);
                 const isActive = (STATE.currentViewUid === STATE.myUid);
-                html += `<div class="avatar-item ${isActive ? 'active' : ''}" onclick="switchView('${STATE.myUid}')" title="切换回自己" >
-    <img src="${remoteUrl}" alt="${escapeHtml(me.name)}" onerror="avatarErrorHandler(this, '${STATE.myUid}', ${JSON.stringify(me.name)})">
-                <span class="vname">${escapeHtml(me.name)} (你)</span>
-                ${isActive ? '<span style="font-size:8px;color:#f0a500;">👁️</span>' : ''}
-            </div>`;
+                html += `<div class="avatar-item ${isActive ? 'active' : ''}" style="animation-delay: 0s;" onclick="switchView('${STATE.myUid}')" title="切换回自己" >
+            <img src="${remoteUrl}" alt="${escapeHtml(me.name)}" onerror="avatarErrorHandler(this, '${STATE.myUid}', ${JSON.stringify(me.name)})">
+            <span class="vname">${escapeHtml(me.name)} (你)</span>
+            ${isActive ? '<span style="font-size:8px;color:#f0a500;">👁️</span>' : ''}
+        </div>`;
             }
 
             // 2. 虚拟玩家列表
             if (virtuals.length === 0) {
                 html += '<div style="color:#667788;font-size:12px;padding:8px 0;">暂无虚拟玩家</div>';
             } else {
-                virtuals.forEach(uid => {
+                virtuals.forEach((uid, index) => {
                     const p = STATE.allPlayers[uid];
-                    const avatar = getAvatarUrl(p.name, p.name);    // 原来 DiceBear 的 URL
+                    const remoteUrl = getAvatarUrl(p.name, p.name);
                     const isActive = STATE.currentViewUid === uid;
-                    html += `<div class="avatar-item ${isActive ? 'active' : ''}" onclick="switchView('${uid}')" >
-    <img src="${remoteUrl}" alt="${escapeHtml(p.name)}" onerror="avatarErrorHandler(this, '${uid}', ${JSON.stringify(p.name)})">
-                    <span class="vname">${escapeHtml(p.name)}</span>
-                    ${isActive ? '<span style="font-size:8px;color:#f0a500;">👁️</span>' : ''}
-                </div>`;
+                    const delay = (index + 1) * 0.05;
+                    html += `<div class="avatar-item ${isActive ? 'active' : ''}" style="animation-delay: ${delay}s;" onclick="switchView('${uid}')" >
+                <img src="${remoteUrl}" alt="${escapeHtml(p.name)}" onerror="avatarErrorHandler(this, '${uid}', ${JSON.stringify(p.name)})">
+                <span class="vname">${escapeHtml(p.name)}</span>
+                ${isActive ? '<span style="font-size:8px;color:#f0a500;">👁️</span>' : ''}
+            </div>`;
                 });
             }
 
@@ -6297,15 +6416,16 @@ ${STATE.proposalRejectCount >= 4
             }
             let html = '<div class="preset-list" style="flex-wrap:wrap; align-items:center;">';
             html += `<button class="btn btn-xs btn-success" onclick="addAllPresets()" style="padding:4px 12px;margin-right:8px;" >➕ 全部加入</button> `;
-            list.forEach(name => {
+            list.forEach((name, index) => {
                 const remoteUrl = getAvatarUrl(name, name);
-                html += `<div class="preset-item">
-    <div class="avatar">
-        <img src="${remoteUrl}" alt="${escapeHtml(name)}" onerror="avatarErrorHandler(this, ${JSON.stringify(name)}, ${JSON.stringify(name)})">
-    </div>
-        <span class="pname" onclick="addPresetToRoom('${escapeHtml(name)}')">${escapeHtml(name)}</span>
-        <button class="del-btn" onclick="removePresetPlayer('${escapeHtml(name)}')">✕</button>
-    </div>`;
+                const delay = index * 0.05;
+                html += `<div class="preset-item" style="animation-delay: ${delay}s;">
+            <div class="avatar">
+                <img src="${remoteUrl}" alt="${escapeHtml(name)}" onerror="avatarErrorHandler(this, ${JSON.stringify(name)}, ${JSON.stringify(name)})">
+            </div>
+            <span class="pname" onclick="addPresetToRoom('${escapeHtml(name)}')">${escapeHtml(name)}</span>
+            <button class="del-btn" onclick="removePresetPlayer('${escapeHtml(name)}')">✕</button>
+        </div>`;
             });
             html += '</div>';
             container.innerHTML = html;
@@ -6397,7 +6517,6 @@ ${STATE.proposalRejectCount >= 4
             const modal = document.getElementById('roleInfoModal');
             const content = document.getElementById('roleInfoContent');
             if (!modal || !content) return;
-
             const roles = STATE.rule ? STATE.rule.roles : [];
             if (roles.length === 0) {
                 content.innerHTML = '<div style="color:#8899aa;">暂无角色配置，请先设置房间规则。</div>';
@@ -6412,26 +6531,16 @@ ${STATE.proposalRejectCount >= 4
                 });
                 content.innerHTML = html;
             }
-
-            modal.style.display = 'flex';
+            showModal(modal);
         }
 
         // ============================================================
         // 显示阿瓦隆基本规则
         // ============================================================
         function showGameRule() {
-
-            const modal =
-                document.getElementById(
-                    'gameRuleModal'
-                );
-
-            if (!modal) {
-                return;
-            }
-
-            modal.style.display =
-                'flex';
+            const modal = document.getElementById('gameRuleModal');
+            if (!modal) return;
+            showModal(modal);
         }
 
         // 关闭模态框（绑定到关闭按钮和背景点击）
@@ -6441,97 +6550,36 @@ ${STATE.proposalRejectCount >= 4
             // 身份说明弹窗
             // ============================================================
 
-            const roleInfoModal =
-                document.getElementById(
-                    'roleInfoModal'
-                );
+            const roleInfoModal = document.getElementById('roleInfoModal');
+            const roleInfoModalClose = document.getElementById('roleInfoModalClose');
 
-            const roleInfoModalClose =
-                document.getElementById(
-                    'roleInfoModalClose'
-                );
-
-
-            // 点击“✕”关闭身份说明
             if (roleInfoModalClose) {
-
-                roleInfoModalClose.addEventListener(
-                    'click',
-                    function () {
-
-                        if (roleInfoModal) {
-
-                            roleInfoModal.style.display =
-                                'none';
-                        }
-
-                    }
-                );
+                roleInfoModalClose.addEventListener('click', function () {
+                    hideModal(roleInfoModal);
+                });
             }
-
-
-            // 点击身份说明弹窗的黑色背景关闭
             if (roleInfoModal) {
-
-                roleInfoModal.addEventListener(
-                    'click',
-                    function (event) {
-
-                        if (
-                            event.target ===
-                            roleInfoModal
-                        ) {
-
-                            roleInfoModal.style.display =
-                                'none';
-                        }
-
-                    }
-                );
+                roleInfoModal.addEventListener('click', function (event) {
+                    if (event.target === roleInfoModal) hideModal(roleInfoModal);
+                });
             }
-
 
             // ============================================================
             // 阿瓦隆基本规则弹窗
             // ============================================================
 
-            const gameRuleModal =
-                document.getElementById(
-                    'gameRuleModal'
-                );
+            const gameRuleModal = document.getElementById('gameRuleModal');
+            const gameRuleModalClose = document.getElementById('gameRuleModalClose');
 
-            const gameRuleModalClose =
-                document.getElementById(
-                    'gameRuleModalClose'
-                );
-
-
-            // 点击“✕”关闭游戏规则
             if (gameRuleModalClose) {
-                gameRuleModalClose.addEventListener(
-                    'click',
-                    function () {
-                        if (gameRuleModal) {
-                            gameRuleModal.style.display =
-                                'none';
-                        }
-                    }
-                );
+                gameRuleModalClose.addEventListener('click', function () {
+                    hideModal(gameRuleModal);
+                });
             }
-            // 点击游戏规则弹窗的黑色背景关闭
             if (gameRuleModal) {
-                gameRuleModal.addEventListener(
-                    'click',
-                    function (event) {
-                        if (
-                            event.target ===
-                            gameRuleModal
-                        ) {
-                            gameRuleModal.style.display =
-                                'none';
-                        }
-                    }
-                );
+                gameRuleModal.addEventListener('click', function (event) {
+                    if (event.target === gameRuleModal) hideModal(gameRuleModal);
+                });
             }
         });
 
@@ -6844,6 +6892,18 @@ ${STATE.proposalRejectCount >= 4
             const roomRef = db.ref('rooms/' + roomId);  // ✅ 新增这一行
             // ✅ 先移除旧监听器，防止重复
             roomRef.off();
+            // 断线状态监听
+            const connectedRef = db.ref('.info/connected');
+            connectedRef.off();
+            connectedRef.on('value', (snap) => {
+                if (snap.val() === true) {
+                    if (STATE.myUid && STATE.roomId) {
+                        const userStatusRef = db.ref('rooms/' + STATE.roomId + '/players/' + STATE.myUid + '/online');
+                        userStatusRef.onDisconnect().set(false);
+                        userStatusRef.set(true);
+                    }
+                }
+            });
             roomRef.on('value', snapshot => {
                 const data = snapshot.val();
                 if (!data) {
@@ -7825,16 +7885,13 @@ ${STATE.proposalRejectCount >= 4
 
         // 规则模态框事件
         document.getElementById('ruleModalClose')?.addEventListener('click', function () {
-            document.getElementById('ruleModal').classList.remove('show');
+            hideModal('ruleModal');
         });
         document.getElementById('ruleModalCancel')?.addEventListener('click', function () {
-            document.getElementById('ruleModal').classList.remove('show');
+            hideModal('ruleModal');
         });
-        // 点击背景关闭
         document.getElementById('ruleModal')?.addEventListener('click', function (e) {
-            if (e.target === this) {
-                this.classList.remove('show');
-            }
+            if (e.target === this) hideModal(this);
         });
 
         // 人数滑动条事件
@@ -8387,29 +8444,18 @@ ${STATE.proposalRejectCount >= 4
             if (target) {
                 const modal = document.getElementById('identityModal');
                 if (modal) {
-                    modal.style.display = 'flex';
-                    try {
-                        updateIdentityContent();
-                    } catch (err) {
-                        console.error('身份信息更新失败:', err);
-                        const content = document.getElementById('identityContent');
-                        if (content) {
-                            content.innerHTML = '<div style="color:#ff6b6b;">⚠️ 加载身份信息失败，请刷新页面</div>';
-                        }
-                    }
+                    updateIdentityContent(); // 先更新内容
+                    showModal(modal);
                 }
             }
         });
 
         document.getElementById('identityModalClose')?.addEventListener('click', function () {
             const modal = document.getElementById('identityModal');
-            if (modal) modal.style.display = 'none';
+            if (modal) hideModal(modal);
         });
-
         document.getElementById('identityModal')?.addEventListener('click', function (e) {
-            if (e.target === this) {
-                this.style.display = 'none';
-            }
+            if (e.target === this) hideModal(this);
         });
 
         // 强制隐藏管理员按钮（每次刷新默认隐藏）

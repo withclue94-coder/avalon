@@ -3504,35 +3504,60 @@
                 return;
             }
 
-            // 获取本轮任务配置
             const config = getMissionConfig(STATE.missionRound);
             if (!config) {
                 showToast('任务配置错误', 1500);
                 return;
             }
 
-            const roomRef = db.ref('rooms/' + STATE.roomId);
+            // 乐观更新本地状态
             const team = STATE.missionTeam || [];
             const idx = team.indexOf(uid);
-
             if (idx >= 0) {
-                // 已选中 → 取消选中
                 team.splice(idx, 1);
-                roomRef.update({ missionTeam: team }).then(() => {
-                    // 界面刷新由监听触发
-                });
             } else {
-                // 未选中 → 检查是否已达上限
                 if (team.length >= config.players) {
                     showToast(`已达到任务人数上限（${config.players}人），请先取消已选中的玩家`, 2500);
                     return;
                 }
-                // 未达上限 → 添加
                 team.push(uid);
-                roomRef.update({ missionTeam: team }).then(() => {
-                    // 界面刷新由监听触发
-                });
             }
+            STATE.missionTeam = team; // 立即生效
+
+            // 立即更新界面（局部刷新）
+            const grid = document.getElementById('missionSelectGrid');
+            if (grid) {
+                const cards = grid.querySelectorAll('.player-card');
+                cards.forEach(card => {
+                    const cardUid = card.dataset.uid;
+                    const isSelected = team.includes(cardUid);
+                    card.style.borderColor = isSelected ? '#f0a500' : '#2a3a5a';
+                    const mark = card.querySelector('.card-mark');
+                    if (mark) {
+                        mark.textContent = isSelected ? '✅' : '';
+                    }
+                });
+                // 更新进度
+                const progressSpan = document.querySelector('#teamProgress .team-count');
+                if (progressSpan) {
+                    progressSpan.textContent = `${team.length} / ${config.players}`;
+                }
+                const confirmBtn = document.getElementById('confirmTeamBtn');
+                if (confirmBtn) {
+                    confirmBtn.disabled = (team.length !== config.players);
+                }
+            } else {
+                // 如果网格不存在（罕见情况），回退到完全渲染
+                renderDayMission();
+            }
+
+            // 异步写入 Firebase（不等待，由监听器最终同步）
+            const roomRef = db.ref('rooms/' + STATE.roomId);
+            roomRef.update({ missionTeam: team }).catch(err => {
+                showToast('同步失败: ' + err.message, 2000);
+                // 若失败，强制重绘以确保一致性
+                renderDayMission();
+            });
         };
 
         // ----- 任务投票 -----
@@ -5473,15 +5498,15 @@ ${STATE.proposalRejectCount >= 4
                 // 始终显示发车顺序
                 const order = STATE.missionOrder || [];
                 const direction = STATE.missionDirection === 'clockwise' ? '顺时针（升序）' : '逆时针（降序）';
-                let orderHtml = `<div style="font-size:15px;color:#8899aa;margin-bottom:8px;" > 当前发车顺序（${direction}）：</div> `;
-                orderHtml += `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;" > `;
+                let orderHtml = `<div style="font-size:15px;color:#8899aa;margin-bottom:8px;">当前发车顺序（${direction}）：</div>`;
+                orderHtml += `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">`;
                 order.forEach((uid) => {
                     const p = allPlayers[uid];
                     const num = STATE.playerNumbers[uid] || '?';
                     const isLeader2 = (uid === currentLeaderUid);
-                    orderHtml += `<span style="background:#0f1a30;padding:4px 12px;border-radius:16px;border:${isLeader2 ? '2px solid #f0a500' : '1px solid #2a3a5a'};" >
-                #${num} ${escapeHtml(p.name)}${isLeader2 ? ' 👑' : ''}
-            </span> `;
+                    orderHtml += `<span style="background:#0f1a30;padding:4px 12px;border-radius:16px;border:${isLeader2 ? '2px solid #f0a500' : '1px solid #2a3a5a'};">
+            #${num} ${escapeHtml(p.name)}${isLeader2 ? ' 👑' : ''}
+        </span>`;
                 });
                 orderHtml += '</div>';
 
@@ -5489,19 +5514,56 @@ ${STATE.proposalRejectCount >= 4
                     const currentTeamSize = STATE.missionTeam.length;
                     const isFull = currentTeamSize >= config.players;
 
+                    // ✅ 检查是否已存在卡片网格（局部更新）
+                    const existingGrid = document.getElementById('missionSelectGrid');
+                    const currentTeam = STATE.missionTeam || [];
+
+                    if (existingGrid) {
+                        // ✅ 已存在 → 只更新卡片样式，不重建
+                        const cards = existingGrid.querySelectorAll('.player-card');
+                        cards.forEach(card => {
+                            const uid = card.dataset.uid;
+                            const isSelected = currentTeam.includes(uid);
+                            // 更新边框
+                            card.style.borderColor = isSelected ? '#f0a500' : '#2a3a5a';
+                            // 更新选中标记
+                            const mark = card.querySelector('.card-mark');
+                            if (mark) {
+                                mark.textContent = isSelected ? '✅' : '';
+                            }
+                        });
+                        // 更新进度信息
+                        const progressSpan = document.querySelector('#teamProgress .team-count');
+                        if (progressSpan) {
+                            progressSpan.textContent = `${currentTeam.length} / ${config.players}`;
+                        }
+                        // 更新确认按钮状态
+                        const confirmBtn = document.getElementById('confirmTeamBtn');
+                        if (confirmBtn) {
+                            confirmBtn.disabled = (currentTeam.length !== config.players);
+                        }
+                        // 清空投票和结果区（确保干净）
+                        votes.innerHTML = '';
+                        result.innerHTML = '';
+                        // action 区域保持不变（已经存在）
+                        updateViewIndicators();
+                        return; // 提前退出，不再全量生成
+                    }
+
+                    // ✅ 首次渲染（或没有网格时），完整生成
                     teamHtml = orderHtml;
                     teamHtml += `<div style="margin-bottom:10px;">
-        <button class="btn btn-sm btn-secondary" onclick="toggleDirection()" style="padding:6px 16px;">🔄 切换方向</button>
-    </div>`;
+            <button class="btn btn-sm btn-secondary" onclick="toggleDirection()" style="padding:6px 16px;">🔄 切换方向</button>
+        </div>`;
 
-                    // ✅ 新增：显示已选人数进度
-                    teamHtml += `<div style="display:flex;justify-content:space-between;align-items:center;background:#1a2744;padding:8px 16px;border-radius:12px;margin-bottom:12px;">
-        <span style="color:#8899aa;">👥 已选队员：</span>
-        <span style="color:${isFull ? '#6fcf97' : '#f0a500'};font-weight:700;font-size:18px;">
-            ${currentTeamSize} / ${config.players}
-        </span>
-        ${isFull ? '<span style="color:#6fcf97;font-size:13px;">✅ 已满员</span>' : `<span style="color:#8899aa;font-size:13px;">还需 ${config.players - currentTeamSize} 人</span>`}
-    </div>`;
+                    // 显示已选人数进度（带 id 方便更新）
+                    teamHtml += `<div style="display:flex;justify-content:space-between;align-items:center;background:#1a2744;padding:8px 16px;border-radius:12px;margin-bottom:12px;" id="teamProgress">
+            <span style="color:#8899aa;">👥 已选队员：</span>
+            <span class="team-count" style="color:${isFull ? '#6fcf97' : '#f0a500'};font-weight:700;font-size:18px;">
+                ${currentTeamSize} / ${config.players}
+            </span>
+            ${isFull ? '<span style="color:#6fcf97;font-size:13px;">✅ 已满员</span>' : `<span style="color:#8899aa;font-size:13px;">还需 ${config.players - currentTeamSize} 人</span>`}
+        </div>`;
 
                     teamHtml += `<div style="font-size:16px;color:#f0a500;margin-bottom:10px;">点击玩家卡片选择任务队员</div>`;
                     teamHtml += '<div class="player-grid" id="missionSelectGrid">';
@@ -5509,99 +5571,59 @@ ${STATE.proposalRejectCount >= 4
                         const p = allPlayers[uid];
                         const isSelected = STATE.missionTeam.includes(uid);
                         const isSelf = (uid === effectiveUid);
-                        const isFull = STATE.missionTeam.length >= config.players;
-                        const disabledStyle = (!isSelected && isFull) ? 'opacity:0.5;cursor:not-allowed;' : 'cursor:pointer;';
-                        const borderColor = isSelected ? '#f0a500' : (isFull ? '#3a4a5a' : '#2a3a5a');
+                        const isFullNow = STATE.missionTeam.length >= config.players;
+                        const disabledStyle = (!isSelected && isFullNow) ? 'opacity:0.5;cursor:not-allowed;' : 'cursor:pointer;';
+                        const borderColor = isSelected ? '#f0a500' : (isFullNow ? '#3a4a5a' : '#2a3a5a');
                         const remoteUrl = getAvatarUrl(p.name, p.name);
                         const delay = index * 0.05;
                         const isLeaderHighlight = (uid === currentLeaderUid);
                         const leaderClass = isLeaderHighlight ? ' leader-highlight' : '';
 
-                        teamHtml += `<div class="player-card${leaderClass}" style="border-color:${borderColor};${disabledStyle} animation-delay: ${delay}s;" onclick="${(!isSelected && isFull) ? '' : `toggleMissionMember('${uid}')`}">
-        <span class="avatar"><img src="${remoteUrl}" alt="${escapeHtml(p.name)}" onerror="avatarErrorHandler(this, '${uid}', ${JSON.stringify(p.name)})"></span>
-        <span class="name">${escapeHtml(p.name)} ${isSelf ? '(你)' : ''}</span>
-        ${isSelected ? '<div style="font-size:20px;color:#f0a500;">✅</div>' : (isFull ? '<div style="font-size:12px;color:#667788;">🔒</div>' : '')}
-    </div>`;
+                        teamHtml += `<div class="player-card${leaderClass}" 
+                data-uid="${uid}" 
+                style="border-color:${borderColor};${disabledStyle} animation-delay: ${delay}s;" 
+                onclick="${(!isSelected && isFullNow) ? '' : `toggleMissionMember('${uid}')`}">
+                <span class="avatar"><img src="${remoteUrl}" alt="${escapeHtml(p.name)}" onerror="avatarErrorHandler(this, '${uid}', ${JSON.stringify(p.name)})"></span>
+                <span class="name">${escapeHtml(p.name)} ${isSelf ? '(你)' : ''}</span>
+                <span class="card-mark" style="font-size:20px;color:#f0a500;">${isSelected ? '✅' : ''}</span>
+            </div>`;
                     });
                     teamHtml += '</div>';
                     const canConfirm = STATE.missionTeam.length === config.players;
-                    teamHtml += `<div style="text-align:center;margin-top:12px;" >
-                <button class="btn btn-success" id="confirmTeamBtn" ${!canConfirm ? 'disabled' : ''} style="padding:12px 32px;font-size:18px;">✅ 确定组队</button>
-                <button class="btn btn-secondary" id="resetTeamBtn" style="padding:12px 32px;font-size:16px;margin-left:10px;">🔄 重置选择</button>
-            </div> `;
-                } else {
-                    // 非车长界面
-                    teamHtml = orderHtml;
-                    const teamMembers = STATE.missionTeam || [];
-                    if (teamMembers.length > 0) {
-                        teamHtml += `<div style="margin-top:10px;font-size:15px;color:#f0a500;" > 当前已选队员：</div> `;
-                        teamHtml += `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px;" > `;
-                        teamMembers.forEach(uid => {
-                            const p = allPlayers[uid];
-                            teamHtml += `<span style="background:#1a2744;padding:4px 12px;border-radius:16px;border:1px solid #f0a500;" >
-                ${escapeHtml(p.name)}
-                    </span> `;
-                        });
-                        teamHtml += '</div>';
-                    } else {
-                        teamHtml += `<div style="margin-top:10px;font-size:14px;color:#8899aa;" > 尚未选择队员</div> `;
-                    }
-                    teamHtml += `<div style="font-size:16px;color:#8899aa;margin-top:12px;" > 等待车长 ${allPlayers[currentLeaderUid]?.name || '未知'} 选择队员...</div> `;
-                }
-                team.innerHTML = teamHtml;
-                votes.innerHTML = '';
-                result.innerHTML = '';
-                // 绑定事件（仅车长）
-                if (isLeader) {
-                    document.getElementById('confirmTeamBtn')?.addEventListener('click', function () {
+                    teamHtml += `<div style="text-align:center;margin-top:12px;">
+            <button class="btn btn-success" id="confirmTeamBtn" ${!canConfirm ? 'disabled' : ''} style="padding:12px 32px;font-size:18px;">✅ 确定组队</button>
+            <button class="btn btn-secondary" id="resetTeamBtn" style="padding:12px 32px;font-size:16px;margin-left:10px;">🔄 重置选择</button>
+        </div>`;
 
+                    team.innerHTML = teamHtml;
+                    votes.innerHTML = '';
+                    result.innerHTML = '';
+
+                    // 绑定事件（只有车长才需要绑定）
+                    document.getElementById('confirmTeamBtn')?.addEventListener('click', function () {
                         if (STATE.missionTeam.length !== config.players) {
                             showToast(`请选择 ${config.players} 名玩家`, 1500);
                             return;
                         }
-
                         const roomRef = db.ref('rooms/' + STATE.roomId);
-
-                        // ------------------------------------------------
-                        // 连续 4 次被拒绝后，第 5 次无需投票，直接发车
-                        // ------------------------------------------------
+                        // 连续4次拒绝逻辑
                         if (STATE.proposalRejectCount >= 4) {
-                            // 记录“第5次强制发车”
-                            saveRideHistory(
-                                STATE.roomId,
-                                STATE.missionRound,
-                                currentLeaderUid,
-                                STATE.missionTeam,
-                                {},
-                                true,
-                                true
-                            );
-
+                            saveRideHistory(STATE.roomId, STATE.missionRound, currentLeaderUid, STATE.missionTeam, {}, true, true);
                             roomRef.update({
                                 missionPhase: 'executing',
                                 missionVotes: {},
                                 missionTaskResults: {},
-                                // 新一轮任务尚未结算
                                 missionFinalized: false,
-                                // 这一轮已经真正发车，重新开始计算连续拒绝次数
-                                // 当前没有客户端在结算
                                 missionFinalizing: null,
                                 missionAdvanceAt: null,
                                 missionAdvanceClaim: null,
                                 proposalRejectCount: 0
                             }).then(() => {
-                                showToast(
-                                    '✅ 连续 4 次被否决，本次队伍直接通过，开始执行任务',
-                                    2500
-                                );
+                                showToast('✅ 连续 4 次被否决，本次队伍直接通过，开始执行任务', 2500);
                             });
-
                             return;
                         }
-
-                        // ------------------------------------------------
-                        // 正常情况下：进入全员发车投票
-                        // ------------------------------------------------
+                        // 正常进入投票
                         roomRef.update({
                             missionPhase: 'voting',
                             missionVotes: {},
@@ -5617,9 +5639,32 @@ ${STATE.proposalRejectCount >= 4
                             showToast('已重置选择', 1500);
                         });
                     });
+
+                } else {
+                    // 非车长界面
+                    teamHtml = orderHtml;
+                    const teamMembers = STATE.missionTeam || [];
+                    if (teamMembers.length > 0) {
+                        teamHtml += `<div style="margin-top:10px;font-size:15px;color:#f0a500;">当前已选队员：</div>`;
+                        teamHtml += `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px;">`;
+                        teamMembers.forEach(uid => {
+                            const p = allPlayers[uid];
+                            teamHtml += `<span style="background:#1a2744;padding:4px 12px;border-radius:16px;border:1px solid #f0a500;">
+                    ${escapeHtml(p.name)}
+                </span>`;
+                        });
+                        teamHtml += '</div>';
+                    } else {
+                        teamHtml += `<div style="margin-top:10px;font-size:14px;color:#8899aa;">尚未选择队员</div>`;
+                    }
+                    teamHtml += `<div style="font-size:16px;color:#8899aa;margin-top:12px;">等待车长 ${allPlayers[currentLeaderUid]?.name || '未知'} 选择队员...</div>`;
+                    team.innerHTML = teamHtml;
+                    votes.innerHTML = '';
+                    result.innerHTML = '';
+                    // action 不需要改变（保留历史按钮等）
                 }
                 updateViewIndicators();
-                return;
+                return; // 确保跳出 selecting 分支
             }
 
             // ---------- 投票 ----------

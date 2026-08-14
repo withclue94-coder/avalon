@@ -2050,6 +2050,7 @@
         // ============================================================
         // 头像降级工具（本地 Git 仓库备用）
         // ============================================================
+        const LOCAL_AVATAR_COUNT = 30; // 👈 以后你加了 avatar10.svg，就改成 10
         // 简单哈希，用于将 uid 映射到 1~9
         function hashToAvatarIndex(uid) {
             let hash = 0;
@@ -2058,7 +2059,7 @@
                 hash = ((hash << 5) - hash) + char;
                 hash = hash & hash; // 转 32 位整数
             }
-            return (Math.abs(hash) % 9) + 1; // 1 ~ 9
+            return (Math.abs(hash) % LOCAL_AVATAR_COUNT) + 1; // 1 ~ LOCAL_AVATAR_COUNT
         }
         // 生成本地头像路径（降级备用）
         function getLocalAvatarUrl(uid) {

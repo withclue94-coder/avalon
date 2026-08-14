@@ -2159,6 +2159,8 @@
         // ============================================================
         // 独立的定时器变量，不污染 DOM
         let toastTimer = null;
+        let lastLobbyState = '';
+        let lastElectState = '';
 
         function showToast(msg, duration = 2500) {
             toast.textContent = msg;
@@ -2851,12 +2853,127 @@
         // ============================================================
         // 模块 6：UI 渲染函数
         // ============================================================
+
+        // 更新房主控制按钮状态（提取自原 renderLobby 的房主逻辑）
+        function updateHostActions() {
+            const effectiveUid = getEffectiveUid();
+            const effectivePlayer = getEffectivePlayer();
+            const isEffectiveHost = effectivePlayer && effectivePlayer.isHost === true;
+            const players = STATE.allPlayers;
+            const playerIds = Object.keys(players);
+
+            if (isEffectiveHost) {
+                hostActions.classList.remove('hidden');
+                const modifyBtn = document.getElementById('modifyRuleBtn');
+                if (modifyBtn) {
+                    modifyBtn.style.display = 'block';
+                    modifyBtn.onclick = function () {
+                        openEditRuleModal();
+                    };
+                }
+                const requiredCount = STATE.rule?.playerCount || 0;
+                const allReady = playerIds.length > 0 && playerIds.every(uid => players[uid].isReady === true);
+                const correctPlayerCount = requiredCount === 0 || playerIds.length === requiredCount;
+                startGameBtn.disabled = !allReady || !correctPlayerCount;
+
+                if (!correctPlayerCount) {
+                    if (playerIds.length < requiredCount) {
+                        startGameBtn.textContent = `⏳ 还需要 ${requiredCount - playerIds.length} 人`;
+                    } else {
+                        startGameBtn.textContent = `⚠️ 人数超出配置（${playerIds.length}/${requiredCount}）`;
+                    }
+                } else if (allReady) {
+                    startGameBtn.textContent = '🚀 分配角色 (' + playerIds.length + '人)';
+                } else {
+                    startGameBtn.textContent = '⏳ 等待所有人准备...';
+                }
+            } else {
+                hostActions.classList.add('hidden');
+                const modifyBtn = document.getElementById('modifyRuleBtn');
+                if (modifyBtn) modifyBtn.style.display = 'none';
+            }
+        }
+
+        // 更新大厅规则显示
+        function updateLobbyRuleDisplay() {
+            const ruleDisplay = document.getElementById('lobbyRuleDisplay');
+            if (!ruleDisplay) return;
+            if (STATE.rule) {
+                const count = STATE.rule.playerCount || 5;
+                const roles = STATE.rule.roles || [];
+                let existingContainer = ruleDisplay.querySelector('.room-rule-info');
+                if (existingContainer) {
+                    const span = existingContainer.querySelector('span');
+                    if (span) {
+                        span.innerHTML = `<strong>👥 ${count} 人</strong> · 🎭 角色：${roles.join('、')}`;
+                    }
+                } else {
+                    ruleDisplay.innerHTML = `
+                <div class="room-rule-info" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+                    <span style="flex:1;min-width:220px;">
+                        <strong>👥 ${count} 人</strong> · 🎭 角色：${roles.join('、')}
+                    </span>
+                    <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                        <button class="btn btn-xs btn-secondary" id="showRoleInfoBtn" style="padding:4px 14px; background:#2a4a6a; border:1px solid #3a5a7a;">📖 身份说明</button>
+                        <button class="btn btn-xs btn-secondary" id="showGameRuleBtn" style="padding:4px 14px; background:#2a4a6a; border:1px solid #3a5a7a;">📜 游戏规则</button>
+                    </div>
+                </div>
+            `;
+                    document.getElementById('showRoleInfoBtn')?.addEventListener('click', showRoleInfo);
+                    document.getElementById('showGameRuleBtn')?.addEventListener('click', showGameRule);
+                }
+                ruleDisplay.style.display = 'block';
+            } else {
+                ruleDisplay.style.display = 'none';
+            }
+        }
+
+        // 在 renderLobby 函数外部定义一个缓存变量（放在文件顶部附近，与 toastTimer 等并列）
         function renderLobby() {
-            const players = STATE.allPlayers, playerIds = Object.keys(players);
-            const effectiveUid = getEffectiveUid(), effectivePlayer = getEffectivePlayer();
+            const players = STATE.allPlayers;
+            const playerIds = Object.keys(players);
+            const effectiveUid = getEffectiveUid();
+            const effectivePlayer = getEffectivePlayer();
+
+            // 更新人数角标（这个始终需要更新）
             playerCountBadge.textContent = playerIds.length + ' 人';
+
+            // 构建当前状态键（包含每个玩家的关键属性）
+            const stateKey = playerIds
+                .sort()
+                .map(uid => {
+                    const p = players[uid];
+                    return `${uid}|${p.name}|${p.isReady ? 1 : 0}|${p.isHost ? 1 : 0}|${p.online === false ? 0 : 1}|${isVirtual(uid) ? 1 : 0}`;
+                })
+                .join(';');
+
+            // 如果状态未变，且之前渲染过网格，则直接跳过重绘（但需更新准备按钮状态）
+            if (stateKey === lastLobbyState && document.querySelector('.player-grid')) {
+                // 仍然需要更新准备按钮状态，因为玩家自身可能变化
+                if (effectivePlayer) {
+                    const isReady = effectivePlayer.isReady || false;
+                    readyBtn.textContent = isReady ? '❌ 取消准备' : '✅ 准备';
+                    readyBtn.disabled = false;
+                } else {
+                    readyBtn.textContent = '✅ 准备';
+                    readyBtn.disabled = true;
+                }
+                // 更新房主按钮状态
+                updateHostActions();
+                // 更新房间信息
+                lobbyRoomInfo.textContent = '房间: ' + STATE.roomId + ' · ' + playerIds.length + ' 人';
+                // 更新规则显示
+                updateLobbyRuleDisplay();
+                return;
+            }
+
+            // 状态变化，更新缓存并执行全量渲染
+            lastLobbyState = stateKey;
+
+            // ----- 全量生成玩家网格 -----
+            const container = playerListContainer;
             if (playerIds.length === 0) {
-                playerListContainer.innerHTML = '<div class="empty-state">暂无玩家</div>';
+                container.innerHTML = '<div class="empty-state">暂无玩家</div>';
             } else {
                 let html = '<div class="player-grid">';
                 playerIds.forEach((uid, index) => {
@@ -2865,27 +2982,28 @@
                     const isReady = p.isReady || false;
                     const isHost = p.isHost || false;
                     const isVirtualPlayer = isVirtual(uid);
-                    // 改为（当前玩家永不显示断线）
                     const isOffline = (p.online === false && uid !== effectiveUid);
                     const avatar = getAvatarUrl(p.name, p.name);
                     const showKick = STATE.isAdmin && effectiveUid === STATE.myUid && uid !== effectiveUid;
                     const delay = index * 0.05;
                     const offlineClass = isOffline ? ' offline' : '';
-                    html += `<div class="player-card${offlineClass}" style="animation-delay: ${delay}s;">
-        <span class="avatar"><img src="${avatar}" alt="${escapeHtml(p.name)}" onerror="avatarErrorHandler(this, '${uid}', ${JSON.stringify(p.name)})"></span>
-        <span class="name">${escapeHtml(p.name)}${isMe ? ' (你)' : ''}</span>
-        <div class="badges">
-            ${isHost ? '<span class="host-badge">房主</span>' : ''}
-            ${isVirtualPlayer ? '<span class="virtual-badge">🧪</span>' : ''}
-            ${isOffline ? '<span class="offline-badge">⚠️ 断线</span>' : ''}
-        </div>
-        <span class="status-dot ${isReady ? 'ready' : 'not-ready'}"></span>
-        ${showKick ? `<button class="kick-btn" onclick="kickPlayer('${uid}')">✕</button>` : ''}
-    </div>`;
+                    html += `<div class="player-card${offlineClass}" data-uid="${uid}" style="animation-delay: ${delay}s;">
+                <span class="avatar"><img src="${avatar}" alt="${escapeHtml(p.name)}" onerror="avatarErrorHandler(this, '${uid}', ${JSON.stringify(p.name)})"></span>
+                <span class="name">${escapeHtml(p.name)}${isMe ? ' (你)' : ''}</span>
+                <div class="badges">
+                    ${isHost ? '<span class="host-badge">房主</span>' : ''}
+                    ${isVirtualPlayer ? '<span class="virtual-badge">🧪</span>' : ''}
+                    ${isOffline ? '<span class="offline-badge">⚠️ 断线</span>' : ''}
+                </div>
+                <span class="status-dot ${isReady ? 'ready' : 'not-ready'}"></span>
+                ${showKick ? `<button class="kick-btn" onclick="kickPlayer('${uid}')">✕</button>` : ''}
+            </div>`;
                 });
                 html += '</div>';
-                playerListContainer.innerHTML = html;
+                container.innerHTML = html;
             }
+
+            // 更新准备按钮状态
             if (effectivePlayer) {
                 const isReady = effectivePlayer.isReady || false;
                 readyBtn.textContent = isReady ? '❌ 取消准备' : '✅ 准备';
@@ -2894,115 +3012,17 @@
                 readyBtn.textContent = '✅ 准备';
                 readyBtn.disabled = true;
             }
-            const isEffectiveHost = effectivePlayer && effectivePlayer.isHost === true;
-            if (isEffectiveHost) {
-                hostActions.classList.remove('hidden');
-                // 显示修改配置按钮
-                const modifyBtn = document.getElementById('modifyRuleBtn');
-                if (modifyBtn) {
-                    modifyBtn.style.display = 'block';
-                    // 防止重复绑定，移除旧事件再添加
-                    modifyBtn.onclick = function () {
-                        openEditRuleModal();
-                    };
-                }
-                const requiredCount = STATE.rule?.playerCount || 0;
 
-                const allReady =
-                    playerIds.length > 0 &&
-                    playerIds.every(uid => players[uid].isReady === true);
+            // 更新房主控制区域
+            updateHostActions();
 
-                const correctPlayerCount =
-                    requiredCount === 0 ||
-                    playerIds.length === requiredCount;
-
-                startGameBtn.disabled = !allReady || !correctPlayerCount;
-
-                if (!correctPlayerCount) {
-                    if (playerIds.length < requiredCount) {
-                        startGameBtn.textContent =
-                            `⏳ 还需要 ${requiredCount - playerIds.length} 人`;
-                    } else {
-                        startGameBtn.textContent =
-                            `⚠️ 人数超出配置（${playerIds.length}/${requiredCount}）`;
-                    }
-                } else if (allReady) {
-                    startGameBtn.textContent =
-                        '🚀 分配角色 (' + playerIds.length + '人)';
-                } else {
-                    startGameBtn.textContent =
-                        '⏳ 等待所有人准备...';
-                }
-            } else {
-                hostActions.classList.add('hidden');
-                // 隐藏修改配置按钮
-                const modifyBtn = document.getElementById('modifyRuleBtn');
-                if (modifyBtn) modifyBtn.style.display = 'none';
-            }
+            // 更新房间信息
             lobbyRoomInfo.textContent = '房间: ' + STATE.roomId + ' · ' + playerIds.length + ' 人';
 
-            // ============================================================
-            // 在 lobbyRoomInfo 下方添加规则展示（优化版）
-            // ============================================================
-            const ruleDisplay = document.getElementById('lobbyRuleDisplay');
-            if (ruleDisplay) {
-                if (STATE.rule) {
-                    const count = STATE.rule.playerCount || 5;
-                    const roles = STATE.rule.roles || [];
+            // 更新规则显示
+            updateLobbyRuleDisplay();
 
-                    // 查找是否已存在规则容器
-                    let existingContainer = ruleDisplay.querySelector('.room-rule-info');
-
-                    if (existingContainer) {
-                        // ----- 已存在容器：只更新内容，不重建 -----
-                        const span = existingContainer.querySelector('span');
-                        if (span) {
-                            span.innerHTML = `<strong>👥 ${count} 人</strong> · 🎭 角色：${roles.join('、')}`;
-                        }
-
-                        // 检查按钮是否存在，如果缺失则补建（防止意外删除）
-                        const btnGroup = existingContainer.querySelector('div[style*="display:flex;gap:6px;"]') || existingContainer;
-                        if (!existingContainer.querySelector('#showRoleInfoBtn')) {
-                            const roleBtn = document.createElement('button');
-                            roleBtn.className = 'btn btn-xs btn-secondary';
-                            roleBtn.id = 'showRoleInfoBtn';
-                            roleBtn.style.cssText = 'padding:4px 14px; background:#2a4a6a; border:1px solid #3a5a7a;';
-                            roleBtn.textContent = '📖 身份说明';
-                            roleBtn.addEventListener('click', showRoleInfo);
-                            btnGroup.appendChild(roleBtn);
-                        }
-                        if (!existingContainer.querySelector('#showGameRuleBtn')) {
-                            const ruleBtn = document.createElement('button');
-                            ruleBtn.className = 'btn btn-xs btn-secondary';
-                            ruleBtn.id = 'showGameRuleBtn';
-                            ruleBtn.style.cssText = 'padding:4px 14px; background:#2a4a6a; border:1px solid #3a5a7a;';
-                            ruleBtn.textContent = '📜 游戏规则';
-                            ruleBtn.addEventListener('click', showGameRule);
-                            btnGroup.appendChild(ruleBtn);
-                        }
-                    } else {
-                        // ----- 首次创建 -----
-                        ruleDisplay.innerHTML = `
-                    <div class="room-rule-info" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
-                        <span style="flex:1;min-width:220px;">
-                            <strong>👥 ${count} 人</strong> · 🎭 角色：${roles.join('、')}
-                        </span>
-                        <div style="display:flex; gap:6px; flex-wrap:wrap;">
-                            <button class="btn btn-xs btn-secondary" id="showRoleInfoBtn" style="padding:4px 14px; background:#2a4a6a; border:1px solid #3a5a7a;">📖 身份说明</button>
-                            <button class="btn btn-xs btn-secondary" id="showGameRuleBtn" style="padding:4px 14px; background:#2a4a6a; border:1px solid #3a5a7a;">📜 游戏规则</button>
-                        </div>
-                    </div>
-                `;
-                        // 绑定按钮事件
-                        document.getElementById('showRoleInfoBtn')?.addEventListener('click', showRoleInfo);
-                        document.getElementById('showGameRuleBtn')?.addEventListener('click', showGameRule);
-                    }
-
-                    ruleDisplay.style.display = 'block';
-                } else {
-                    ruleDisplay.style.display = 'none';
-                }
-            }
+            // 视角指示器
             updateViewIndicators();
         }
 
@@ -5056,7 +5076,24 @@
             const electFinished = STATE.electFinished || false;
             const leaderUid = STATE.leaderUid || null;
 
-            // ---------- 选举已结束 ----------
+            // 构建状态键（包含所有选举相关数据）
+            const stateKey = JSON.stringify({
+                electPhase,
+                candidates: candidates.sort(),
+                electChoice,
+                electVotes,
+                electFinished,
+                leaderUid
+            });
+
+            // 如果状态未变且已渲染过，直接返回
+            if (stateKey === lastElectState && candidatesDiv.children.length > 0) {
+                return;
+            }
+            lastElectState = stateKey;
+
+            // ---------- 原有渲染逻辑保持不变 ----------
+            // 选举已结束
             if (electFinished && leaderUid) {
                 const leaderName = allPlayers[leaderUid]?.name || '未知';
                 subtitle.textContent = `🏆 车长已选出：${escapeHtml(leaderName)}`;
@@ -5112,7 +5149,7 @@
                 return;
             }
 
-            // ---------- 竞选阶段 ----------
+            // 竞选阶段
             if (electPhase === 'campaign') {
                 subtitle.textContent = '🗳️ 请选择：竞选或退选';
                 const totalPlayers = playerIds.length;
@@ -5190,7 +5227,7 @@
                 return;
             }
 
-            // ---------- 投票阶段 ----------
+            // 投票阶段
             if (electPhase === 'voting') {
                 if (candidates.length === 1) {
                     const roomRef = db.ref('rooms/' + STATE.roomId);

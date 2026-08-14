@@ -6703,10 +6703,21 @@ ${STATE.proposalRejectCount >= 4
         window.kickPlayer = function (uid) {
             if (!confirm('确定要踢出玩家 "' + STATE.allPlayers[uid]?.name + '" 吗？')) return;
             const roomRef = db.ref('rooms/' + STATE.roomId);
-            roomRef.update({ ['players/' + uid]: null }).then(() => {
+            // ✅ 同时清除该玩家的选举状态
+            const updates = {
+                ['players/' + uid]: null,
+                ['electChoice/' + uid]: null,
+                ['electVotes/' + uid]: null
+            };
+            roomRef.update(updates).then(() => {
                 if (STATE.allPlayers[uid] && STATE.allPlayers[uid].isHost) {
                     const remaining = Object.keys(STATE.allPlayers).filter(id => id !== uid);
-                    if (remaining.length > 0) roomRef.update({ host: remaining[0], ['players/' + remaining[0] + '/isHost']: true });
+                    if (remaining.length > 0) {
+                        roomRef.update({
+                            host: remaining[0],
+                            ['players/' + remaining[0] + '/isHost']: true
+                        });
+                    }
                 }
                 showToast('已踢出玩家', 1500);
                 delete STATE.allPlayers[uid];
@@ -7755,8 +7766,22 @@ ${STATE.proposalRejectCount >= 4
         function addVirtualPlayer(name) {
             const uid = getVirtualUid(name);
             const roomRef = db.ref('rooms/' + STATE.roomId);
-            const playerData = { name, isHost: false, isReady: false, role: null, hasConfirmedNight: false, joinedAt: Date.now(), isVirtual: true, deviceId: 'virtual' };
-            return roomRef.update({ ['players/' + uid]: playerData }).then(() => {
+            const playerData = {
+                name: name,
+                isHost: false,
+                isReady: false,
+                role: null,
+                hasConfirmedNight: false,
+                joinedAt: Date.now(),
+                isVirtual: true,
+                deviceId: 'virtual'
+            };
+            // ✅ 清除该 uid 可能残留的选举状态（防止同名残留）
+            return roomRef.update({
+                ['players/' + uid]: playerData,
+                ['electChoice/' + uid]: null,   // 清除选举选择
+                ['electVotes/' + uid]: null     // 清除投票记录
+            }).then(() => {
                 STATE.allPlayers[uid] = playerData;
                 return { success: true, uid };
             });
@@ -7801,9 +7826,11 @@ ${STATE.proposalRejectCount >= 4
                     const players = data.players || {};
                     const playerIds = Object.keys(players);
 
-                    // 移除当前玩家
-                    const updates = {};
-                    updates['players/' + STATE.myUid] = null;
+                    const updates = {
+                        ['players/' + STATE.myUid]: null,
+                        ['electChoice/' + STATE.myUid]: null,
+                        ['electVotes/' + STATE.myUid]: null
+                    };
 
                     // 如果当前玩家是房主，需要转移房主权限或删除房间
                     const isHost = players[STATE.myUid]?.isHost || false;

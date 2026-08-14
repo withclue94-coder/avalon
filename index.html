@@ -2047,9 +2047,29 @@
         function generateRoomId() { const c = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'; let r = ''; for (let i = 0; i < 6; i++) r += c.charAt(Math.floor(Math.random() * c.length)); return r; }
         function shuffleArray(arr) { for (let i = arr.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1));[arr[i], arr[j]] = [arr[j], arr[i]]; } return arr; }
         function escapeHtml(text) { const d = document.createElement('div'); d.textContent = text; return d.innerHTML; }
+        // ============================================================
+        // 头像降级工具（本地 Git 仓库备用）
+        // ============================================================
+        // 简单哈希，用于将 uid 映射到 1~9
+        function hashToAvatarIndex(uid) {
+            let hash = 0;
+            for (let i = 0; i < uid.length; i++) {
+                const char = uid.charCodeAt(i);
+                hash = ((hash << 5) - hash) + char;
+                hash = hash & hash; // 转 32 位整数
+            }
+            return (Math.abs(hash) % 9) + 1; // 1 ~ 9
+        }
+        // 生成本地头像路径（降级备用）
+        function getLocalAvatarUrl(uid) {
+            const idx = String(hashToAvatarIndex(uid)).padStart(2, '0');
+            return `assets/avatars/avatar${idx}.svg`;
+        }
+        // ============================================================
+        // 原来的远程头像获取（保持不变）
+        // ============================================================
         function getAvatarUrl(name, seed) {
             const s = seed || name || 'default';
-            // DiceBear头像风格探索
             return 'https://api.dicebear.com/9.x/notionists/svg?seed=' + encodeURIComponent(s);
         }
         function isVirtual(uid) { return uid && uid.startsWith('virtual_'); }
@@ -2526,29 +2546,28 @@
                 const role = p.role;
                 const isBad = role && ['莫甘娜', '刺客', '莫德雷德', '奥伯伦', '爪牙'].includes(role);
                 const isSelected = (uid === selectedTarget);
+                // ✅ 定义远程和本地头像地址
+                const remoteUrl = getAvatarUrl(p.name, p.name);
+                const localFallback = getLocalAvatarUrl(uid);
 
                 if (isBad) {
                     // 坏人同伴：显示但不可点击
-                    const avatar = getAvatarUrl(p.name, p.name);
                     html += `<div class="player-card" style="cursor:not-allowed;opacity:0.6;border-color:#2a3a5a;">
-    <span class="avatar"><img src="${avatar}" alt=""></span>
-    <span class="name">${escapeHtml(p.name)}</span>
-    <div style="font-size:12px;color:#ff6b6b;">👥 同伴（不可选）</div>
-</div>`;
+            <span class="avatar"><img src="${remoteUrl}" alt="" onerror="this.onerror=null; this.src='${localFallback}'"></span>
+            <span class="name">${escapeHtml(p.name)}</span>
+            <div style="font-size:12px;color:#ff6b6b;">👥 同伴（不可选）</div>
+        </div>`;
                 } else {
                     // 好人玩家：显示可点击
-                    const avatar = getAvatarUrl(p.name, p.name);
                     const borderColor = isSelected ? '#f0a500' : '#2a3a5a';
                     const shadow = isSelected ? '0 0 20px rgba(240,165,0,0.5)' : 'none';
                     html += `<div class="player-card" style="cursor:pointer;border-color:${borderColor};box-shadow:${shadow};transition:all 0.3s;" onclick="selectAssassinationTarget('${uid}')">
-    <span class="avatar"><img src="${avatar}" alt=""></span>
-    <span class="name">${escapeHtml(p.name)}</span>
-    <div style="font-size:12px;color:#667788;">👤 ？？？</div>
-    ${isSelected ? '<div style="font-size:14px;color:#f0a500;font-weight:bold;">✅ 已选中</div>' : ''}
-</div>`;
-                    if (isSelected) {
-                        selectedName = p.name;
-                    }
+            <span class="avatar"><img src="${remoteUrl}" alt="" onerror="this.onerror=null; this.src='${localFallback}'"></span>
+            <span class="name">${escapeHtml(p.name)}</span>
+            <div style="font-size:12px;color:#667788;">👤 ？？？</div>
+            ${isSelected ? '<div style="font-size:14px;color:#f0a500;font-weight:bold;">✅ 已选中</div>' : ''}
+        </div>`;
+                    if (isSelected) selectedName = p.name;
                 }
             });
 
@@ -2620,13 +2639,20 @@
 
             // 更新头像和名字（如果有）
             if (isTestView && player) {
-                const avatar = getAvatarUrl(player.name, player.name);
-                // 更新所有视角的头像和名字（包括 viewIndicator5）
+                const remoteUrl = getAvatarUrl(player.name, player.name);          // 远程 DiceBear 地址
+                const localFallback = getLocalAvatarUrl(STATE.currentViewUid);     // 本地备用地址（使用当前视角的 uid）
                 const avatarIds = ['viewIndicatorAvatar', 'viewIndicatorAvatar2', 'viewIndicatorAvatar3', 'viewIndicatorAvatar4', 'viewIndicatorAvatar5', 'viewIndicatorAvatar6'];
                 const nameIds = ['viewIndicatorName', 'viewIndicatorName2', 'viewIndicatorName3', 'viewIndicatorName4', 'viewIndicatorName5', 'viewIndicatorName6'];
                 avatarIds.forEach(id => {
                     const img = document.getElementById(id);
-                    if (img) img.src = avatar;
+                    if (img) {
+                        img.src = remoteUrl;
+                        // 关键：绑定 onerror，加载失败时切换到本地头像
+                        img.onerror = function () {
+                            this.onerror = null;       // 防止循环
+                            this.src = localFallback;
+                        };
+                    }
                 });
                 nameIds.forEach(id => {
                     const span = document.getElementById(id);
@@ -2652,11 +2678,12 @@
                     const isReady = p.isReady || false;
                     const isHost = p.isHost || false;
                     const isVirtualPlayer = isVirtual(uid);
-                    const avatar = getAvatarUrl(p.name, p.name);
+                    const avatar = getAvatarUrl(p.name, p.name);    // 原来 DiceBear 的 URL
+                    const localFallback = getLocalAvatarUrl(uid);    // 本地 assets/avatars/avatarXX.svg
                     // 踢出按钮：仅当管理员且当前视角为自己时显示（不能踢自己）
                     const showKick = STATE.isAdmin && effectiveUid === STATE.myUid && uid !== effectiveUid;
                     html += `<div class="player-card">
-    <span class="avatar"><img src="${avatar}" alt=""></span>
+    <span class="avatar"><img src="${avatar}" alt="" onerror="this.onerror=null; this.src='${localFallback}'"></span>
     <span class="name">${escapeHtml(p.name)}${isMe ? ' (你)' : ''}</span>
     <div class="badges">
         ${isHost ? '<span class="host-badge">房主</span>' : ''}
@@ -2975,8 +3002,10 @@
                     playerIds.forEach(uid => {
                         if (uid === currentUid) return;
                         const p = players[uid];
+                        const remoteUrl = getAvatarUrl(p.name, p.name);
+                        const localFallback = getLocalAvatarUrl(uid);
                         html += `<div class="player-card" style="cursor:pointer;" onclick="knightCheck('${uid}')">
-                    <span class="avatar"><img src="${getAvatarUrl(p.name, p.name)}" alt=""></span>
+                    <span class="avatar"><img src="${remoteUrl}" onerror="this.onerror=null; this.src='${localFallback}'" alt=""></span>
                     <span class="name">${escapeHtml(p.name)}</span>
                 </div>`;
                     });
@@ -2994,8 +3023,10 @@
                     playerIds.forEach(uid => {
                         if (uid === currentUid) return;
                         const p = players[uid];
+                        const remoteUrl = getAvatarUrl(p.name, p.name);
+                        const localFallback = getLocalAvatarUrl(uid);
                         html += `<div class="player-card" style="cursor:pointer;" onclick="guardProtect('${uid}')">
-                    <span class="avatar"><img src="${getAvatarUrl(p.name, p.name)}" alt=""></span>
+                    <span class="avatar"><img src="${remoteUrl}" onerror="this.onerror=null; this.src='${localFallback}'" alt=""></span>
                     <span class="name">${escapeHtml(p.name)}</span>
                 </div>`;
                     });
@@ -4856,10 +4887,12 @@
                     html += '<div class="player-grid" style="grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));">';
                     campaigners.forEach(uid => {
                         const p = allPlayers[uid];
+                        const remoteUrl = getAvatarUrl(p.name, p.name);
+                        const localFallback = getLocalAvatarUrl(uid);
                         html += `<div class="player-card" style="padding:8px;">
-                    <span class="avatar" style="width:48px;height:48px;"><img src="${getAvatarUrl(p.name, p.name)}" alt=""></span>
-                    <span class="name" style="font-size:13px;">${escapeHtml(p.name)}</span>
-                </div>`;
+                        <span class="avatar" style="width:48px;height:48px;"><img src="${remoteUrl}" onerror="this.onerror=null; this.src='${localFallback}'" alt=""></span>
+                        <span class="name" style="font-size:13px;">${escapeHtml(p.name)}</span>
+                    </div>`;
                     });
                     html += '</div>';
                 }
@@ -4945,13 +4978,15 @@
                     const voteCount = Object.values(electVotes).filter(cuid => cuid === uid).length;
                     const voters = Object.keys(electVotes).filter(v => electVotes[v] === uid).map(v => allPlayers[v]?.name || '未知');
                     const canVote = !candidateSet.has(effectiveUid) && !votedPlayers.includes(effectiveUid) && effectiveUid !== uid;
+                    const remoteUrl = getAvatarUrl(p.name, p.name);
+                    const localFallback = getLocalAvatarUrl(uid);
                     html += `<div class="player-card" style="padding:12px 8px;">
-    <span class="avatar"><img src="${getAvatarUrl(p.name, p.name)}" alt=""></span>
-    <span class="name">${escapeHtml(p.name)}</span>
-    <div style="font-size:14px;color:#f0a500;margin-top:4px;">${voteCount} 票</div>
-    <div style="font-size:11px;color:#667788;min-height:20px;">${voters.length ? '投票人: ' + voters.join('、') : ''}</div>
-    ${canVote ? `<button class="btn btn-sm btn-primary" onclick="castVote('${effectiveUid}','${uid}')" style="margin-top:8px;padding:6px 14px;font-size:13px;">投票</button>` : ''}
-</div>`;
+        <span class="avatar"><img src="${remoteUrl}" onerror="this.onerror=null; this.src='${localFallback}'" alt=""></span>
+        <span class="name">${escapeHtml(p.name)}</span>
+        <div style="font-size:14px;color:#f0a500;margin-top:4px;">${voteCount} 票</div>
+        <div style="font-size:11px;color:#667788;min-height:20px;">${voters.length ? '投票人: ' + voters.join('、') : ''}</div>
+        ${canVote ? `<button class="btn btn-sm btn-primary" onclick="castVote('${effectiveUid}','${uid}')" style="margin-top:8px;padding:6px 14px;font-size:13px;">投票</button>` : ''}
+    </div>`;
                 });
                 html += '</div>';
                 const totalNonCandidates = nonCandidates.length;
@@ -5265,11 +5300,15 @@ ${STATE.proposalRejectCount >= 4
                         const disabledStyle = (!isSelected && isFull) ? 'opacity:0.5;cursor:not-allowed;' : 'cursor:pointer;';
                         const borderColor = isSelected ? '#f0a500' : (isFull ? '#3a4a5a' : '#2a3a5a');
 
+                        // 在循环内（playerIds.forEach 或类似）添加两行
+                        const remoteUrl = getAvatarUrl(p.name, p.name);
+                        const localFallback = getLocalAvatarUrl(uid);
+
                         teamHtml += `<div class="player-card" style="border-color:${borderColor};${disabledStyle}" onclick="${(!isSelected && isFull) ? '' : `toggleMissionMember('${uid}')`}">
-        <span class="avatar"><img src="${getAvatarUrl(p.name, p.name)}" alt=""></span>
-        <span class="name">${escapeHtml(p.name)} ${isSelf ? '(你)' : ''}</span>
-        ${isSelected ? '<div style="font-size:20px;color:#f0a500;">✅</div>' : (isFull ? '<div style="font-size:12px;color:#667788;">🔒</div>' : '')}
-    </div>`;
+    <span class="avatar"><img src="${remoteUrl}" onerror="this.onerror=null; this.src='${localFallback}'" alt=""></span>
+    <span class="name">${escapeHtml(p.name)} ${isSelf ? '(你)' : ''}</span>
+    ${isSelected ? '<div style="font-size:20px;color:#f0a500;">✅</div>' : (isFull ? '<div style="font-size:12px;color:#667788;">🔒</div>' : '')}
+</div>`;
                     });
                     teamHtml += '</div>';
                     const canConfirm = STATE.missionTeam.length === config.players;
@@ -6171,13 +6210,14 @@ ${STATE.proposalRejectCount >= 4
             // 1. 管理员自己的头像（便于切换回自己）
             if (STATE.isAdmin && STATE.myUid && STATE.allPlayers[STATE.myUid]) {
                 const me = STATE.allPlayers[STATE.myUid];
-                const avatar = getAvatarUrl(me.name, me.name);
+                const remoteUrl = getAvatarUrl(me.name, me.name);
+                const localFallback = getLocalAvatarUrl(STATE.myUid);
                 const isActive = (STATE.currentViewUid === STATE.myUid);
                 html += `<div class="avatar-item ${isActive ? 'active' : ''}" onclick="switchView('${STATE.myUid}')" title="切换回自己" >
-                <img src="${avatar}" alt="">
-                    <span class="vname">${escapeHtml(me.name)} (你)</span>
-                    ${isActive ? '<span style="font-size:8px;color:#f0a500;">👁️</span>' : ''}
-                </div>`;
+                <img src="${remoteUrl}" onerror="this.onerror=null; this.src='${localFallback}'" alt="">
+                <span class="vname">${escapeHtml(me.name)} (你)</span>
+                ${isActive ? '<span style="font-size:8px;color:#f0a500;">👁️</span>' : ''}
+            </div>`;
             }
 
             // 2. 虚拟玩家列表
@@ -6186,10 +6226,11 @@ ${STATE.proposalRejectCount >= 4
             } else {
                 virtuals.forEach(uid => {
                     const p = STATE.allPlayers[uid];
-                    const avatar = getAvatarUrl(p.name, p.name);
+                    const avatar = getAvatarUrl(p.name, p.name);    // 原来 DiceBear 的 URL
+                    const localFallback = getLocalAvatarUrl(uid);    // 本地 assets/avatars/avatarXX.svg
                     const isActive = STATE.currentViewUid === uid;
                     html += `<div class="avatar-item ${isActive ? 'active' : ''}" onclick="switchView('${uid}')" >
-                <img src="${avatar}" alt="">
+                <img src="${avatar}" alt="" onerror="this.onerror=null; this.src='${localFallback}'">
                     <span class="vname">${escapeHtml(p.name)}</span>
                     ${isActive ? '<span style="font-size:8px;color:#f0a500;">👁️</span>' : ''}
                 </div>`;
@@ -6222,14 +6263,15 @@ ${STATE.proposalRejectCount >= 4
             let html = '<div class="preset-list" style="flex-wrap:wrap; align-items:center;">';
             html += `<button class="btn btn-xs btn-success" onclick="addAllPresets()" style="padding:4px 12px;margin-right:8px;" >➕ 全部加入</button> `;
             list.forEach(name => {
-                const avatar = getAvatarUrl(name, name);
-                html += `<div class="preset-item" >
-                <div class="avatar" onclick="addPresetToRoom('${escapeHtml(name)}')" title="点击添加到房间">
-                    <img src="${avatar}" alt="">
-                </div>
-                <span class="pname" onclick="addPresetToRoom('${escapeHtml(name)}')">${escapeHtml(name)}</span>
-                <button class="del-btn" onclick="removePresetPlayer('${escapeHtml(name)}')">✕</button>
-            </div> `;
+                const remoteUrl = getAvatarUrl(name, name);
+                const localFallback = getLocalAvatarUrl(name);   // 使用 name 作为 uid
+                html += `<div class="preset-item">
+        <div class="avatar" onclick="addPresetToRoom('${escapeHtml(name)}')" title="点击添加到房间">
+            <img src="${remoteUrl}" alt="" onerror="this.onerror=null; this.src='${localFallback}'">
+        </div>
+        <span class="pname" onclick="addPresetToRoom('${escapeHtml(name)}')">${escapeHtml(name)}</span>
+        <button class="del-btn" onclick="removePresetPlayer('${escapeHtml(name)}')">✕</button>
+    </div>`;
             });
             html += '</div>';
             container.innerHTML = html;

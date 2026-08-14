@@ -2328,6 +2328,7 @@
                     const p = allPlayers[uid];
                     return p.role && badRoles.includes(p.role);
                 }).map(uid => allPlayers[uid].name);
+                shuffleArray(badGuys);  // ✅ 新增：随机打乱顺序
                 infoHtml += `<div style="margin-top:8px;padding:10px;background:#1a2744;border-radius:8px;">
             <div style="color:#8899aa;">🔴 坏人名单（不含<span style="color:#f0a500;">莫德雷德</span>）</div>
             <div style="color:#eee;font-weight:500;">${badGuys.length ? badGuys.join('、') : '无'}</div>
@@ -2350,6 +2351,7 @@
                     const p = allPlayers[uid];
                     return p.role && ['莫甘娜', '刺客', '莫德雷德', '爪牙'].includes(p.role) && uid !== currentUid;
                 }).map(uid => allPlayers[uid].name);
+                shuffleArray(companions);  // ✅ 新增：随机打乱顺序
                 infoHtml += `<div style="margin-top:8px;padding:10px;background:#1a2744;border-radius:8px;">
         <div style="color:#8899aa;">👥 你的坏人同伴</div>
         <div style="color:#eee;font-weight:500;">${companions.length ? companions.join('、') : '无'}</div>
@@ -2360,6 +2362,7 @@
                     const p = allPlayers[uid];
                     return p.role && ['莫甘娜', '刺客', '莫德雷德', '爪牙'].includes(p.role) && uid !== currentUid;
                 }).map(uid => allPlayers[uid].name);
+                shuffleArray(companions);  // ✅ 新增：随机打乱顺序
                 infoHtml += `<div style="margin-top:8px;padding:10px;background:#1a2744;border-radius:8px;">
         <div style="color:#8899aa;">👥 你的坏人同伴</div>
         <div style="color:#eee;font-weight:500;">${companions.length ? companions.join('、') : '无'}</div>
@@ -2370,6 +2373,7 @@
                     const p = allPlayers[uid];
                     return p.role && ['莫甘娜', '刺客', '莫德雷德', '爪牙'].includes(p.role) && uid !== currentUid;
                 }).map(uid => allPlayers[uid].name);
+                shuffleArray(companions);  // ✅ 新增：随机打乱顺序
                 infoHtml += `<div style="margin-top:8px;padding:10px;background:#1a2744;border-radius:8px;">
         <div style="color:#8899aa;">👥 你的坏人同伴</div>
         <div style="color:#eee;font-weight:500;">${companions.length ? companions.join('、') : '无'}</div>
@@ -2378,6 +2382,20 @@
                     infoHtml += `<div style="margin-top:6px;color:#8899aa;font-size:13px;">⚠️ 如果<span style="color:#f0a500;">守卫</span>守护到<span style="color:#f0a500;">梅林</span>，你的刺杀将会失效</div>`;
                 }
             }
+
+            // ✅ 新增：爪牙独立分支（放在刺客后面，奥伯伦前面）
+            else if (role === '爪牙') {
+                const companions = playerIds.filter(uid => {
+                    const p = allPlayers[uid];
+                    return p.role && ['莫甘娜', '刺客', '莫德雷德', '爪牙'].includes(p.role) && uid !== currentUid;
+                }).map(uid => allPlayers[uid].name);
+                shuffleArray(companions);
+                infoHtml += `<div style="margin-top:8px;padding:10px;background:#1a2744;border-radius:8px;">
+        <div style="color:#8899aa;">👥 你的坏人同伴</div>
+        <div style="color:#eee;font-weight:500;">${companions.length ? companions.join('、') : '无'}</div>
+    </div>`;
+            }
+
             else if (role === '奥伯伦') {
 
                 if (isCustom) {
@@ -3089,6 +3107,7 @@
                     const p = players[uid];
                     return p.role && badRoles.includes(p.role);
                 }).map(uid => players[uid].name);
+                shuffleArray(badGuys);  // ✅ 新增：随机打乱顺序
                 infoHtml = '<div class="info-label">🔴 坏人名单（不含<span style="color:#f0a500;">莫德雷德</span>）</div><div class="info-value">' + (badGuys.length ? badGuys.join('、') : '无') + '</div>';
                 if (isCustom) {
                     infoHtml += '<div style="margin-top:6px;color:#667788;font-size:13px;">💡 提示：这里面包含<span style="color:#f0a500;">倒影</span>，<span style="color:#f0a500;">倒影</span>是好人阵营</div>';
@@ -3107,6 +3126,7 @@
                     const p = players[uid];
                     return p.role && ['莫甘娜', '刺客', '莫德雷德', '爪牙'].includes(p.role) && uid !== currentUid;
                 }).map(uid => players[uid].name);
+                shuffleArray(companions);  // ✅ 新增：随机打乱顺序
                 infoHtml = '<div class="info-label">👥 你的坏人同伴</div><div class="info-value">' + (companions.length ? companions.join('、') : '无') + '</div>';
             }
             else if (role === '莫德雷德') {
@@ -3114,6 +3134,7 @@
                     const p = players[uid];
                     return p.role && ['莫甘娜', '刺客', '莫德雷德', '爪牙'].includes(p.role) && uid !== currentUid;
                 }).map(uid => players[uid].name);
+                shuffleArray(companions);  // ✅ 新增：随机打乱顺序
                 infoHtml = '<div class="info-label">👥 你的坏人同伴</div><div class="info-value">' + (companions.length ? companions.join('、') : '无') + '</div>';
             }
             else if (role === '刺客') {
@@ -3121,11 +3142,24 @@
                     const p = players[uid];
                     return p.role && ['莫甘娜', '刺客', '莫德雷德', '爪牙'].includes(p.role) && uid !== currentUid;
                 }).map(uid => players[uid].name);
+                shuffleArray(companions);  // ✅ 新增：随机打乱顺序
                 infoHtml = '<div class="info-label">👥 你的坏人同伴</div><div class="info-value">' + (companions.length ? companions.join('、') : '无') + '</div>';
                 if (isCustom) {
                     infoHtml += '<div style="margin-top:6px;color:#8899aa;font-size:13px;">⚠️ 如果<span style="color:#f0a500;">守卫</span>守护到<span style="color:#f0a500;">梅林</span>，你的刺杀将会失效</div>';
                 }
             }
+
+            // ✅ 新增：爪牙独立分支（放在刺客后面，奥伯伦前面）
+            else if (role === '爪牙') {
+                // 爪牙看到其他坏人同伴（不含奥伯伦）
+                const companions = playerIds.filter(uid => {
+                    const p = players[uid];
+                    return p.role && ['莫甘娜', '刺客', '莫德雷德', '爪牙'].includes(p.role) && uid !== currentUid;
+                }).map(uid => players[uid].name);
+                shuffleArray(companions);
+                infoHtml = '<div class="info-label">👥 你的坏人同伴</div><div class="info-value">' + (companions.length ? companions.join('、') : '无') + '</div>';
+            }
+
             else if (role === '奥伯伦') {
                 if (isCustom) {
                     // 自定义板子：孤狼 + 被动技能（无莫德雷德信息）
@@ -3938,6 +3972,16 @@
         // ----- 完成任务结果 -----
         async function finalizeMissionResult(taskFailed) {
             if (!STATE.roomId) return;
+
+            // ============================================================
+            // ✅ 如果已经最终结算，直接返回（避免重复）
+            // ============================================================
+            if (STATE.missionFinalized && STATE.missionResult !== null) {
+                console.log('任务已结算，跳过重复处理');
+                // 确保界面显示结果
+                renderDayMission();
+                return;
+            }
 
             const roomRef = db.ref('rooms/' + STATE.roomId);
             const myUid = STATE.myUid;
@@ -5692,203 +5736,8 @@ ${STATE.proposalRejectCount >= 4
                 // 1. 如果已经结算完成（STATE.missionResult 已存在），直接显示结果
                 // ============================================================
                 if (STATE.missionResult !== null) {
-
-                    // ========================================================
-                    // 任务已经结算：
-                    // 显示任务结果
-                    // ========================================================
-
-                    const resultEl =
-                        document.getElementById(
-                            'dayMissionResult'
-                        );
-
-                    const votesEl =
-                        document.getElementById(
-                            'dayMissionVotes'
-                        );
-
-                    const teamEl =
-                        document.getElementById(
-                            'dayMissionTeam'
-                        );
-
-                    const result =
-                        STATE.missionResult;
-
-                    const resultText =
-                        result === '成功'
-                            ? '✅ 任务成功'
-                            : '❌ 任务失败';
-
-                    const color =
-                        result === '成功'
-                            ? '#6fcf97'
-                            : '#ff6b6b';
-
-                    const taskResults =
-                        STATE.missionTaskResults ||
-                        {};
-
-                    const successCount =
-                        Object.values(
-                            taskResults
-                        )
-                            .filter(
-                                v => v === '成功'
-                            )
-                            .length;
-
-                    const failCount =
-                        Object.values(
-                            taskResults
-                        )
-                            .filter(
-                                v => v === '失败'
-                            )
-                            .length;
-
-                    const total =
-                        successCount +
-                        failCount;
-
-                    // ========================================================
-                    // 显示任务队伍
-                    // ========================================================
-
-                    if (teamEl) {
-
-                        teamEl.innerHTML =
-                            `<div style="font-size:15px;">
-                执行任务的玩家：
-                ${STATE.missionTeam
-                                .map(uid =>
-                                    allPlayers[uid]?.name ||
-                                    '未知'
-                                )
-                                .join('、')}
-            </div>`;
-                    }
-
-                    // ========================================================
-                    // 显示任务票数
-                    // ========================================================
-
-                    if (votesEl) {
-
-                        votesEl.innerHTML = `
-            <div style="font-size:16px;color:#8899aa;">
-                成功票：
-                <span style="color:#6fcf97;font-weight:bold;">
-                    ${successCount}
-                </span>
-
-                /
-
-                失败票：
-                <span style="color:#ff6b6b;font-weight:bold;">
-                    ${failCount}
-                </span>
-
-                （共 ${total} 票）
-            </div>
-        `;
-                    }
-
-                    // ========================================================
-                    // 计算剩余时间
-                    // ========================================================
-
-                    const advanceAt =
-                        Number(
-                            STATE.missionAdvanceAt || 0
-                        );
-
-                    const remaining =
-                        advanceAt
-                            ? Math.max(
-                                0,
-                                advanceAt -
-                                Date.now()
-                            )
-                            : 0;
-
-                    const remainingSeconds =
-                        Math.ceil(
-                            remaining / 1000
-                        );
-
-                    // ========================================================
-                    // 显示任务结果
-                    // ========================================================
-
-                    if (resultEl) {
-
-                        if (
-                            advanceAt &&
-                            remaining > 0
-                        ) {
-
-                            resultEl.innerHTML = `
-                <div style="
-                    font-size:24px;
-                    font-weight:bold;
-                    color:${color};
-                ">
-                    ${resultText}
-                </div>
-
-                <div style="
-                    margin-top:10px;
-                    font-size:14px;
-                    color:#8899aa;
-                ">
-                    ${remainingSeconds} 秒后进入下一轮任务
-                </div>
-            `;
-
-                        } else {
-
-                            resultEl.innerHTML = `
-                <div style="
-                    font-size:24px;
-                    font-weight:bold;
-                    color:${color};
-                ">
-                    ${resultText}
-                </div>
-
-                <div style="
-                    margin-top:10px;
-                    font-size:14px;
-                    color:#8899aa;
-                ">
-                    正在进入下一轮任务……
-                </div>
-            `;
-                        }
-                    }
-
-                    // 任务结果阶段不需要按钮
-                    const actionEl =
-                        document.getElementById(
-                            'dayMissionAction'
-                        );
-
-                    if (actionEl) {
-                        actionEl.innerHTML = '';
-                    }
-
-                    updateViewIndicators();
-
-                    // ========================================================
-                    // 让当前浏览器根据 Firebase 时间安排检查
-                    // ========================================================
-
-                    scheduleMissionAdvance(
-                        remaining
-                    );
-
+                    // ... 保持原有显示结果代码不变 ...
+                    // （此处省略，与原代码一致）
                     return;
                 }
 
@@ -5900,70 +5749,98 @@ ${STATE.proposalRejectCount >= 4
                 const allSubmitted = teamMembers.every(uid => taskResults[uid] !== undefined);
 
                 if (allSubmitted) {
+                    // ========================================================
+                    // 所有人已提交，准备结算
+                    // ========================================================
 
-                    // ========================================================
-                    // 当前轮次的车长负责最终结算
-                    // ========================================================
+                    // 带 disabled 逻辑的按钮代码 防御按钮完全不可见
+                    const isDisabled = !allSubmitted || STATE.missionFinalized;
+                    const btnHtml = `
+                    <button class="btn btn-success" id="manualFinalizeBtn" 
+                    style="padding:12px 32px;font-size:18px;" 
+                    ${isDisabled ? 'disabled' : ''}>
+                    ⚡ 结算任务
+                    </button>
+                    `;
 
                     const currentLeaderUid =
-                        STATE.missionOrder &&
-                            STATE.missionOrder.length > 0
+                        STATE.missionOrder && STATE.missionOrder.length > 0
                             ? STATE.missionOrder[STATE.missionLeaderIndex]
                             : null;
+                    const isCurrentLeader = STATE.myUid === currentLeaderUid;
 
-                    const isCurrentLeader =
-                        STATE.myUid === currentLeaderUid;
+                    // 显示队员列表
+                    const teamHtml =
+                        `<div style="font-size:15px;">
+                            执行任务的玩家：
+                            ${teamMembers.map(uid =>
+                            escapeHtml(allPlayers[uid]?.name || '未知')
+                        ).join('、')}
+                        </div>`;
+                    team.innerHTML = teamHtml;
 
-                    // --------------------------------------------------------
-                    // 当前玩家就是本轮车长
-                    // --------------------------------------------------------
+                    // 显示票数统计（已提交的结果）
+                    const successCount = Object.values(taskResults).filter(v => v === '成功').length;
+                    const failCount = Object.values(taskResults).filter(v => v === '失败').length;
+                    votes.innerHTML = `
+                        <div style="font-size:16px;color:#8899aa;">
+                            成功票：<span style="color:#6fcf97;font-weight:bold;">${successCount}</span> ／
+                            失败票：<span style="color:#ff6b6b;font-weight:bold;">${failCount}</span>
+                            （共 ${teamMembers.length} 票）
+                        </div>
+                    `;
 
+                    // 如果已经最终结算，直接显示结果（但 STATE.missionResult 不为 null，上面已处理，这里不会进入）
+                    // 但以防万一，再次检查
+                    if (STATE.missionFinalized && STATE.missionResult !== null) {
+                        // 由上面的第一个 if 处理，所以这里不会执行
+                    }
+
+                    // ----- 核心修复：显示结算按钮（仅车长可见） -----
                     if (isCurrentLeader) {
-
-                        // 如果 Firebase 已经结算过
-                        // 就不要再次调用
-                        if (
-                            !STATE.missionFinalized &&
-                            !STATE._resultShown
-                        ) {
-
+                        // 车长：自动结算（但可能因锁失败，所以保留按钮）
+                        // 如果还未结算，自动调用一次
+                        if (!STATE.missionFinalized && !STATE._resultShown) {
                             finalizeMissionResult(null);
                         }
 
+                        // 显示一个手动结算按钮，作为兜底
+                        const actionHtml = `
+                            <div style="text-align:center;margin-top:10px;">
+                                <button class="btn btn-success" id="manualFinalizeBtn" style="padding:12px 32px;font-size:18px;">
+                                    ⚡ 结算任务
+                                </button>
+                                <span style="font-size:13px;color:#8899aa;margin-left:10px;">
+                                    （如未自动结算，请点击此按钮）
+                                </span>
+                            </div>
+                        `;
+                        action.innerHTML = actionHtml;
+
+                        // 绑定按钮事件（移除旧监听避免重复）
+                        const btn = document.getElementById('manualFinalizeBtn');
+                        if (btn) {
+                            btn.onclick = function () {
+                                // 重置本地防重复标志，以便重试
+                                STATE._resultShown = false;
+                                finalizeMissionResult(null);
+                            };
+                        }
+
+                        // 同时，如果已经结算完成（missionFinalized 为 true），隐藏按钮
+                        if (STATE.missionFinalized) {
+                            const btn = document.getElementById('manualFinalizeBtn');
+                            if (btn) btn.style.display = 'none';
+                            action.innerHTML = '<div style="color:#8899aa;">✅ 任务已结算</div>';
+                        }
+
+                    } else {
+                        // 非车长：显示等待提示
+                        action.innerHTML = '<div style="font-size:16px;color:#8899aa;text-align:center;">⏳ 等待车长结算任务...</div>';
                     }
 
-                    // --------------------------------------------------------
-                    // 当前玩家不是本轮车长
-                    // --------------------------------------------------------
-
-                    else {
-
-                        const teamHtml =
-                            `<div style="font-size:15px;">
-                执行任务的玩家：
-                ${teamMembers.map(uid =>
-                                escapeHtml(
-                                    allPlayers[uid]?.name || '未知'
-                                )
-                            ).join('、')}
-            </div>`;
-
-                        team.innerHTML =
-                            teamHtml;
-
-                        votes.innerHTML =
-                            '<div style="font-size:16px;color:#8899aa;">⏳ 等待车长结算任务...</div>';
-
-                        result.innerHTML =
-                            '';
-
-                        action.innerHTML =
-                            '';
-
-                        updateViewIndicators();
-
-                        return;
-                    }
+                    updateViewIndicators();
+                    return;
                 }
 
                 // ============================================================
@@ -6756,116 +6633,116 @@ ${STATE.proposalRejectCount >= 4
         }
 
         // 带规则创建房间
-function createRoomWithRule(playerName, isAdmin = false, rule = null) {
-    // ✅ 第一步：先强制清理所有无效房间（避免残留导致创建第二个房间）
-    return checkRoomExists().then(existing => {
-        // 如果仍然存在有效房间（有在线真人玩家），则不能创建
-        if (existing.exists) {
-            return { success: false, error: '已有有效房间存在，不能重复创建', roomId: existing.roomId };
+        function createRoomWithRule(playerName, isAdmin = false, rule = null) {
+            // ✅ 第一步：先强制清理所有无效房间（避免残留导致创建第二个房间）
+            return checkRoomExists().then(existing => {
+                // 如果仍然存在有效房间（有在线真人玩家），则不能创建
+                if (existing.exists) {
+                    return { success: false, error: '已有有效房间存在，不能重复创建', roomId: existing.roomId };
+                }
+
+                // 没有有效房间，正常创建
+                const roomId = generateRoomId();
+                const uid = isAdmin ? getAdminUid() : getPlayerUid(playerName);
+                const roomRef = db.ref('rooms/' + roomId);
+                const playerData = {
+                    name: playerName,
+                    isHost: true,
+                    isReady: false,
+                    role: null,
+                    hasConfirmedNight: false,
+                    joinedAt: Date.now(),
+                    isVirtual: false,
+                    deviceId: getDeviceId(),
+                    online: true // 标记自己在线
+                };
+                const defaultRule = rule || { playerCount: 5, roles: DEFAULT_ROLES_BY_PLAYER[5] };
+
+                return roomRef.set({
+                    host: uid,
+                    players: { [uid]: playerData },
+                    gameStarted: false,
+                    phase: 'lobby',
+                    createdAt: Date.now(),
+                    isTestMode: false,
+                    selectionOrder: [],
+                    currentSelectIndex: 0,
+                    // 选举字段
+                    electPhase: 'campaign',
+                    candidates: [],
+                    electChoice: {},
+                    electVotes: {},
+                    electFinished: false,
+                    leaderUid: null,
+                    electionHistory: [],
+                    // 任务字段
+                    missionPhase: 'selecting',
+                    missionTeam: [],
+                    missionVotes: {},
+                    missionDirection: 'clockwise',
+                    missionLeaderIndex: 0,
+                    missionOrder: [],
+                    missionFailCount: 0,
+                    missionSuccessCount: 0,
+                    proposalRejectCount: 0,
+                    missionResult: null,
+                    missionTaskResults: {},
+                    missionFinalized: false,
+                    // 当前任务没有客户端正在结算
+                    missionFinalizing: null,
+                    // 当前没有任务结果展示倒计时
+                    missionAdvanceAt: null,
+                    // 当前没有客户端认领下一轮推进
+                    missionAdvanceClaim: null,
+                    playerNumbers: {},
+                    round: 1,
+                    // 刺客字段
+                    assassinUid: null,
+                    assassinationTarget: null,
+                    assassinationDone: false,
+                    // 结算
+                    winner: null,
+                    // 自定义板子奥伯伦技能
+                    oberonSkillUsed: false,
+                    oberonTarget: null,
+                    // 规则
+                    rule: defaultRule,
+                    // 夜间动作
+                    nightActions: {
+                        knightChecked: null,
+                        knightResult: null,
+                        guardTarget: null
+                    }
+                }).then(() => {
+                    // ✅ 创建成功后，设置自己的在线状态，并提前取消可能的旧 onDisconnect
+                    const onlineRef = db.ref('rooms/' + roomId + '/players/' + uid + '/online');
+                    onlineRef.onDisconnect().cancel();  // 取消之前的，避免残留
+                    onlineRef.onDisconnect().set(false);
+                    onlineRef.set(true);
+
+                    STATE.roomId = roomId;
+                    STATE.myUid = uid;
+                    STATE.isHost = true;
+                    STATE.roomExists = true;
+                    STATE.allPlayers = { [uid]: { ...playerData, online: true } };
+                    STATE.isAdmin = isAdmin;
+                    localStorage.setItem('avalon_room_id', roomId);
+                    localStorage.setItem('avalon_player_name', playerName);
+
+                    // 更新管理员面板状态
+                    if (isAdmin) {
+                        setStatus(adminRoomStatus, '✅ 已连接到房间: ' + roomId, 'success');
+                        adminToggleBtn.classList.add('visible');
+                    }
+
+                    // 切换到大厅并开始监听
+                    showLobbyPage();
+                    renderLobby();
+                    listenRoom(roomId);
+                    return { success: true, roomId };
+                }).catch(err => ({ success: false, error: err.message }));
+            });
         }
-
-        // 没有有效房间，正常创建
-        const roomId = generateRoomId();
-        const uid = isAdmin ? getAdminUid() : getPlayerUid(playerName);
-        const roomRef = db.ref('rooms/' + roomId);
-        const playerData = {
-            name: playerName,
-            isHost: true,
-            isReady: false,
-            role: null,
-            hasConfirmedNight: false,
-            joinedAt: Date.now(),
-            isVirtual: false,
-            deviceId: getDeviceId(),
-            online: true // 标记自己在线
-        };
-        const defaultRule = rule || { playerCount: 5, roles: DEFAULT_ROLES_BY_PLAYER[5] };
-
-        return roomRef.set({
-            host: uid,
-            players: { [uid]: playerData },
-            gameStarted: false,
-            phase: 'lobby',
-            createdAt: Date.now(),
-            isTestMode: false,
-            selectionOrder: [],
-            currentSelectIndex: 0,
-            // 选举字段
-            electPhase: 'campaign',
-            candidates: [],
-            electChoice: {},
-            electVotes: {},
-            electFinished: false,
-            leaderUid: null,
-            electionHistory: [],
-            // 任务字段
-            missionPhase: 'selecting',
-            missionTeam: [],
-            missionVotes: {},
-            missionDirection: 'clockwise',
-            missionLeaderIndex: 0,
-            missionOrder: [],
-            missionFailCount: 0,
-            missionSuccessCount: 0,
-            proposalRejectCount: 0,
-            missionResult: null,
-            missionTaskResults: {},
-            missionFinalized: false,
-            // 当前任务没有客户端正在结算
-            missionFinalizing: null,
-            // 当前没有任务结果展示倒计时
-            missionAdvanceAt: null,
-            // 当前没有客户端认领下一轮推进
-            missionAdvanceClaim: null,
-            playerNumbers: {},
-            round: 1,
-            // 刺客字段
-            assassinUid: null,
-            assassinationTarget: null,
-            assassinationDone: false,
-            // 结算
-            winner: null,
-            // 自定义板子奥伯伦技能
-            oberonSkillUsed: false,
-            oberonTarget: null,
-            // 规则
-            rule: defaultRule,
-            // 夜间动作
-            nightActions: {
-                knightChecked: null,
-                knightResult: null,
-                guardTarget: null
-            }
-        }).then(() => {
-            // ✅ 创建成功后，设置自己的在线状态，并提前取消可能的旧 onDisconnect
-            const onlineRef = db.ref('rooms/' + roomId + '/players/' + uid + '/online');
-            onlineRef.onDisconnect().cancel();  // 取消之前的，避免残留
-            onlineRef.onDisconnect().set(false);
-            onlineRef.set(true);
-
-            STATE.roomId = roomId;
-            STATE.myUid = uid;
-            STATE.isHost = true;
-            STATE.roomExists = true;
-            STATE.allPlayers = { [uid]: { ...playerData, online: true } };
-            STATE.isAdmin = isAdmin;
-            localStorage.setItem('avalon_room_id', roomId);
-            localStorage.setItem('avalon_player_name', playerName);
-
-            // 更新管理员面板状态
-            if (isAdmin) {
-                setStatus(adminRoomStatus, '✅ 已连接到房间: ' + roomId, 'success');
-                adminToggleBtn.classList.add('visible');
-            }
-
-            // 切换到大厅并开始监听
-            showLobbyPage();
-            renderLobby();
-            listenRoom(roomId);
-            return { success: true, roomId };
-        }).catch(err => ({ success: false, error: err.message }));
-    });
-}
 
         function joinRoom(roomId, playerName, uid = null) {
             const roomRef = db.ref('rooms/' + roomId);

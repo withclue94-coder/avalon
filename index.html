@@ -2555,9 +2555,9 @@
 			</div>
 		</div>`;
 		// 显示已守护目标
-		if (player.guardTarget) {
+		if (effectivePlayer.guardTarget) {
 			const guardPlayer =
-				players[player.guardTarget];
+				allPlayers[effectivePlayer.guardTarget];
 			const guardName =
 				guardPlayer?.name || '未知';
 			infoHtml += `

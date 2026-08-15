@@ -4772,7 +4772,6 @@ async function tryAdvanceMissionRound() {
     // 8. 计算下一轮（基于 latestData）
     // ============================================================
     const nextRound = currentRound + 1;
-
     const missionOrder = latestData.missionOrder || STATE.missionOrder || [];
     const orderLength = missionOrder.length;
 
@@ -5362,24 +5361,45 @@ ${STATE.proposalRejectCount >= 4
             });
 
             // ---------- 组队选择 ----------
-            if (missionPhase === 'selecting') {
-                // ✅ 新增：视角切换缓存判断
-                const selectingStateKey = JSON.stringify({
-                    effectiveUid: getEffectiveUid(),
-                    missionTeam: STATE.missionTeam,
-                    missionOrder: STATE.missionOrder,
-                    missionLeaderIndex: STATE.missionLeaderIndex,
-                    missionDirection: STATE.missionDirection,
-                    missionRound: STATE.missionRound,
-					isLeader: (effectiveUid === currentLeaderUid) // ✅ 新增
-                });
+if (missionPhase === 'selecting') {
+    const effectiveUid = getEffectiveUid();
+    const currentLeaderUid = STATE.missionOrder && STATE.missionOrder.length > 0 ? STATE.missionOrder[STATE.missionLeaderIndex] : null;
+    const isLeader = (effectiveUid === currentLeaderUid);
 
-                if (selectingStateKey === lastDayMissionSelectingState && document.getElementById('missionSelectGrid')) {
-                    // 状态未变，跳过重绘，但需要更新视角指示器
-                    updateViewIndicators();
-                    return;
-                }
-                lastDayMissionSelectingState = selectingStateKey;
+    // 获取当前网格
+    const existingGrid = document.getElementById('missionSelectGrid');
+    const lastLeader = STATE._lastSelectingLeaderUid || null;
+
+    // 如果网格存在且车长未变（轮次相同），则只更新卡片样式，不重建
+    if (existingGrid && currentLeaderUid === lastLeader) {
+        const currentTeam = STATE.missionTeam || [];
+        const cards = existingGrid.querySelectorAll('.player-card');
+        cards.forEach(card => {
+            const uid = card.dataset.uid;
+            const isSelected = currentTeam.includes(uid);
+            card.style.borderColor = isSelected ? '#f0a500' : '#2a3a5a';
+            const mark = card.querySelector('.card-mark');
+            if (mark) mark.textContent = isSelected ? '✅' : '';
+        });
+
+        // 更新进度信息
+        const config = getMissionConfig(STATE.missionRound);
+        if (config) {
+            const progressSpan = document.querySelector('#teamProgress .team-count');
+            if (progressSpan) {
+                progressSpan.textContent = `${currentTeam.length} / ${config.players}`;
+            }
+            const confirmBtn = document.getElementById('confirmTeamBtn');
+            if (confirmBtn) {
+                confirmBtn.disabled = (currentTeam.length !== config.players);
+            }
+        }
+        updateViewIndicators();
+        return; // 直接返回，不重建
+    }
+
+    // 记录当前车长，用于后续比较
+    STATE._lastSelectingLeaderUid = currentLeaderUid;
 
                 let teamHtml = '';
                 // 始终显示发车顺序

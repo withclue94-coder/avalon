@@ -2254,24 +2254,24 @@
         function isVirtual(uid) { return uid && uid.startsWith('virtual_'); }
         function isAdminUid(uid) { return uid && uid.startsWith('admin_'); }
         function getDeviceId() { let id = localStorage.getItem('avalon_device_id'); if (!id) { id = 'dev_' + Date.now() + '_' + Math.random().toString(36).substring(2, 8); localStorage.setItem('avalon_device_id', id); } return id; }
-		function getPlayerUid(name) {
-			let uid = sessionStorage.getItem('avalon_player_uid');
-			if (!uid) {
-				uid =
-				'player_' +
-				getDeviceId() +
-				'_' +
-				Math.random()
-                .toString(36)
-                .substring(2, 8);
-				
-			sessionStorage.setItem(
-            'avalon_player_uid',
-            uid
-				);
-			}
-			return uid;
-		}
+        function getPlayerUid(name) {
+            let uid = sessionStorage.getItem('avalon_player_uid');
+            if (!uid) {
+                uid =
+                    'player_' +
+                    getDeviceId() +
+                    '_' +
+                    Math.random()
+                        .toString(36)
+                        .substring(2, 8);
+
+                sessionStorage.setItem(
+                    'avalon_player_uid',
+                    uid
+                );
+            }
+            return uid;
+        }
         function getAdminUid() { return 'admin_' + getDeviceId(); }
         function getVirtualUid(name) { return 'virtual_' + name + '_' + Date.now(); }
         function getEffectiveUid() { if (STATE.isTestMode && STATE.currentViewUid && STATE.allPlayers[STATE.currentViewUid]) return STATE.currentViewUid; return STATE.myUid; }
@@ -2514,8 +2514,8 @@
             <div style="color:#667788;font-size:12px;margin-top:4px;">💡 在<span style="color:#f0a500;">梅林</span>眼中，你被视为坏人，但你是好人阵营</div>
         </div>`;
             }
-		else if (role === '骑士') {
-			infoHtml += `
+            else if (role === '骑士') {
+                infoHtml += `
 			<div style="margin-top:8px;padding:10px;background:#1a2744;border-radius:8px;">
 				<div style="color:#8899aa;">⚔️ 骑士能力</div>
 				<div style="color:#eee;font-weight:500;">
@@ -2523,17 +2523,17 @@
             （	<span style="color:#f0a500;">莫德雷德</span>也显示为好人）。
 				</div>
 			</div>`;
-			// 显示骑士自己的查验结果
-		if (effectivePlayer.knightChecked) {
-			const checkedUid =
-				effectivePlayer.knightTarget;
-        const checkedName =
-            allPlayers[checkedUid]?.name ||
-            '未知';
-        const result =
-            effectivePlayer.knightResult ||
-            '未知';
-        infoHtml += `
+                // 显示骑士自己的查验结果
+                if (effectivePlayer.knightChecked) {
+                    const checkedUid =
+                        effectivePlayer.knightTarget;
+                    const checkedName =
+                        allPlayers[checkedUid]?.name ||
+                        '未知';
+                    const result =
+                        effectivePlayer.knightResult ||
+                        '未知';
+                    infoHtml += `
         <div style="margin-top:8px;padding:10px;background:#1a2744;border-radius:8px;border-left:3px solid #f0a500;">
             <div style="color:#8899aa;">
                 🔍 你查验了：${escapeHtml(checkedName)}
@@ -2542,10 +2542,10 @@
                 身份为：${result}阵营
             </div>
         </div>`;
-			}
-		} 
-		else if (role === '守卫') {
-		infoHtml += `
+                }
+            }
+            else if (role === '守卫') {
+                infoHtml += `
 		<div style="margin-top:8px;padding:10px;background:#1a2744;border-radius:8px;">
 			<div style="color:#8899aa;">🛡️ 守卫能力</div>
 			<div style="color:#eee;font-weight:500;">
@@ -2554,13 +2554,13 @@
 				<span style="color:#f0a500;">梅林</span>被刺杀时也是好人胜利。
 			</div>
 		</div>`;
-		// 显示已守护目标
-		if (effectivePlayer.guardTarget) {
-			const guardPlayer =
-				allPlayers[effectivePlayer.guardTarget];
-			const guardName =
-				guardPlayer?.name || '未知';
-			infoHtml += `
+                // 显示已守护目标
+                if (effectivePlayer.guardTarget) {
+                    const guardPlayer =
+                        allPlayers[effectivePlayer.guardTarget];
+                    const guardName =
+                        guardPlayer?.name || '未知';
+                    infoHtml += `
 			<div style="margin-top:8px;padding:10px;background:#1a2744;border-radius:8px;border-left:3px solid #f0a500;">
 				<div style="color:#8899aa;">
 					🛡️ 你守护了：${escapeHtml(guardName)}
@@ -2570,8 +2570,8 @@
 					被刺杀时好人将胜利
 				</div>
 			</div>`;
-			}
-		}
+                }
+            }
             else {
                 // 忠臣
                 infoHtml += `<div style="margin-top:8px;padding:10px;background:#1a2744;border-radius:8px;">
@@ -3748,11 +3748,11 @@
                 showToast('只能在组队阶段切换方向', 1500);
                 return;
             }
-			    // 新增：只有首轮车长可以切换
-			if (STATE.missionRound !== 1) {
-			showToast('只有首轮车长可以设定发车顺序', 1500);
-			return;
-			}
+            // 新增：只有首轮车长可以切换
+            if (STATE.missionRound !== 1) {
+                showToast('只有首轮车长可以设定发车顺序', 1500);
+                return;
+            }
             const effectiveUid = getEffectiveUid();
             const currentLeaderUid = STATE.missionOrder && STATE.missionOrder.length > 0 ? STATE.missionOrder[STATE.missionLeaderIndex] : null;
             if (effectiveUid !== currentLeaderUid) {
@@ -4645,215 +4645,215 @@
         // 普通玩家刷新页面
         // 都不会让任务永久卡在结果页。
         // ============================================================
-async function tryAdvanceMissionRound() {
+        async function tryAdvanceMissionRound() {
 
-    if (!STATE.roomId) {
-        return;
-    }
+            if (!STATE.roomId) {
+                return;
+            }
 
-    const roomRef = db.ref('rooms/' + STATE.roomId);
+            const roomRef = db.ref('rooms/' + STATE.roomId);
 
-    let snapshot;
+            let snapshot;
 
-    try {
-        snapshot = await roomRef.once('value');
-    } catch (err) {
-        console.error('读取任务推进状态失败:', err);
-        return;
-    }
+            try {
+                snapshot = await roomRef.once('value');
+            } catch (err) {
+                console.error('读取任务推进状态失败:', err);
+                return;
+            }
 
-    const data = snapshot.val();
+            const data = snapshot.val();
 
-    if (!data) {
-        return;
-    }
+            if (!data) {
+                return;
+            }
 
-    // ============================================================
-    // 1. 当前必须仍然处于任务阶段
-    // ============================================================
-    if (data.phase !== 'day_mission') {
-        return;
-    }
+            // ============================================================
+            // 1. 当前必须仍然处于任务阶段
+            // ============================================================
+            if (data.phase !== 'day_mission') {
+                return;
+            }
 
-    // ============================================================
-    // 2. 必须已经完成任务结算
-    // ============================================================
-    if (
-        data.missionFinalized !== true ||
-        data.missionResult === null ||
-        data.missionResult === undefined
-    ) {
-        return;
-    }
+            // ============================================================
+            // 2. 必须已经完成任务结算
+            // ============================================================
+            if (
+                data.missionFinalized !== true ||
+                data.missionResult === null ||
+                data.missionResult === undefined
+            ) {
+                return;
+            }
 
-    // ============================================================
-    // 3. 必须存在下一轮推进时间
-    // ============================================================
-    const advanceAt = Number(data.missionAdvanceAt || 0);
-    if (!advanceAt) {
-        return;
-    }
+            // ============================================================
+            // 3. 必须存在下一轮推进时间
+            // ============================================================
+            const advanceAt = Number(data.missionAdvanceAt || 0);
+            if (!advanceAt) {
+                return;
+            }
 
-    // ============================================================
-    // 4. 还没到时间
-    // ============================================================
-    const remaining = advanceAt - Date.now();
-    if (remaining > 0) {
-        scheduleMissionAdvance(remaining);
-        return;
-    }
+            // ============================================================
+            // 4. 还没到时间
+            // ============================================================
+            const remaining = advanceAt - Date.now();
+            if (remaining > 0) {
+                scheduleMissionAdvance(remaining);
+                return;
+            }
 
-    // ============================================================
-    // 5. 已经到时间，使用 transaction 原子认领
-    // ============================================================
-    const currentRound = Number(data.round || data.missionRound || STATE.missionRound || 1);
+            // ============================================================
+            // 5. 已经到时间，使用 transaction 原子认领
+            // ============================================================
+            const currentRound = Number(data.round || data.missionRound || STATE.missionRound || 1);
 
-    let claimResult;
+            let claimResult;
 
-    try {
-        claimResult = await roomRef
-            .child('missionAdvanceClaim')
-            .transaction(currentValue => {
-                // 已经有人认领当前轮
-                if (currentValue && currentValue.round === currentRound) {
-                    // 检查时间戳，超过30秒允许抢占
-                    if (Date.now() - currentValue.time < 30000) {
-                        return; // 拒绝
-                    }
-                }
-                // 当前客户端认领当前轮
-                return {
-                    round: currentRound,
-                    uid: STATE.myUid || null,
-                    time: Date.now()
-                };
-            });
-    } catch (err) {
-        console.error('认领下一轮推进权失败:', err);
-        return;
-    }
+            try {
+                claimResult = await roomRef
+                    .child('missionAdvanceClaim')
+                    .transaction(currentValue => {
+                        // 已经有人认领当前轮
+                        if (currentValue && currentValue.round === currentRound) {
+                            // 检查时间戳，超过30秒允许抢占
+                            if (Date.now() - currentValue.time < 30000) {
+                                return; // 拒绝
+                            }
+                        }
+                        // 当前客户端认领当前轮
+                        return {
+                            round: currentRound,
+                            uid: STATE.myUid || null,
+                            time: Date.now()
+                        };
+                    });
+            } catch (err) {
+                console.error('认领下一轮推进权失败:', err);
+                return;
+            }
 
-    // ============================================================
-    // 6. 当前客户端没有抢到推进权
-    // ============================================================
-    if (!claimResult || !claimResult.committed) {
-        return;
-    }
+            // ============================================================
+            // 6. 当前客户端没有抢到推进权
+            // ============================================================
+            if (!claimResult || !claimResult.committed) {
+                return;
+            }
 
-    // ============================================================
-    // ✅ 7. 抢到后重新读取最新数据，确认轮次一致（可选增强，合并后续逻辑）
-    // ============================================================
-    let latestData;
-    try {
-        const latestSnapshot = await roomRef.once('value');
-        latestData = latestSnapshot.val();
-    } catch (err) {
-        console.error('重新读取任务状态失败:', err);
-        return;
-    }
+            // ============================================================
+            // ✅ 7. 抢到后重新读取最新数据，确认轮次一致（可选增强，合并后续逻辑）
+            // ============================================================
+            let latestData;
+            try {
+                const latestSnapshot = await roomRef.once('value');
+                latestData = latestSnapshot.val();
+            } catch (err) {
+                console.error('重新读取任务状态失败:', err);
+                return;
+            }
 
-    if (!latestData) {
-        console.warn('房间数据丢失，放弃推进');
-        return;
-    }
+            if (!latestData) {
+                console.warn('房间数据丢失，放弃推进');
+                return;
+            }
 
-    const latestRound = Number(latestData.round || latestData.missionRound || 1);
-    if (latestRound !== currentRound) {
-        console.log(`轮次已变 (${currentRound} → ${latestRound})，放弃推进`);
-        return;
-    }
+            const latestRound = Number(latestData.round || latestData.missionRound || 1);
+            if (latestRound !== currentRound) {
+                console.log(`轮次已变 (${currentRound} → ${latestRound})，放弃推进`);
+                return;
+            }
 
-    // 如果已经进入下一阶段，放弃
-    if (latestData.phase !== 'day_mission') {
-        return;
-    }
+            // 如果已经进入下一阶段，放弃
+            if (latestData.phase !== 'day_mission') {
+                return;
+            }
 
-    // ============================================================
-    // 8. 计算下一轮（基于 latestData）
-    // ============================================================
-    const nextRound = currentRound + 1;
-    const missionOrder = latestData.missionOrder || STATE.missionOrder || [];
-    const orderLength = missionOrder.length;
+            // ============================================================
+            // 8. 计算下一轮（基于 latestData）
+            // ============================================================
+            const nextRound = currentRound + 1;
+            const missionOrder = latestData.missionOrder || STATE.missionOrder || [];
+            const orderLength = missionOrder.length;
 
-    let nextMissionOrder = missionOrder;
-    let nextLeaderIndex = Number(latestData.missionLeaderIndex || 0);
+            let nextMissionOrder = missionOrder;
+            let nextLeaderIndex = Number(latestData.missionLeaderIndex || 0);
 
-    if (orderLength === 0) {
-        const allPlayerIds = Object.keys(latestData.players || STATE.allPlayers || {});
-        nextMissionOrder = allPlayerIds;
-        nextLeaderIndex = 0;
-    } else {
-        nextLeaderIndex = (nextLeaderIndex + 1) % orderLength;
-    }
+            if (orderLength === 0) {
+                const allPlayerIds = Object.keys(latestData.players || STATE.allPlayers || {});
+                nextMissionOrder = allPlayerIds;
+                nextLeaderIndex = 0;
+            } else {
+                nextLeaderIndex = (nextLeaderIndex + 1) % orderLength;
+            }
 
-    // ============================================================
-    // 9. 写入下一轮状态
-    // ============================================================
-    const nextUpdates = {
-        round: nextRound,
-        missionRound: nextRound,
-        missionPhase: 'selecting',
-        missionTeam: [],
-        missionVotes: {},
-        missionTaskResults: {},
-        missionResult: null,
-        missionFinalized: false,
-        missionFinalizing: null,
-        missionAdvanceAt: null,
-        missionAdvanceClaim: null,
-        proposalRejectCount: 0,
-        missionOrder: nextMissionOrder,
-        missionLeaderIndex: nextLeaderIndex,
-        oberonSkillUsed: latestData.oberonSkillUsed || false,
-        oberonTarget: latestData.oberonTarget || null,
-    };
+            // ============================================================
+            // 9. 写入下一轮状态
+            // ============================================================
+            const nextUpdates = {
+                round: nextRound,
+                missionRound: nextRound,
+                missionPhase: 'selecting',
+                missionTeam: [],
+                missionVotes: {},
+                missionTaskResults: {},
+                missionResult: null,
+                missionFinalized: false,
+                missionFinalizing: null,
+                missionAdvanceAt: null,
+                missionAdvanceClaim: null,
+                proposalRejectCount: 0,
+                missionOrder: nextMissionOrder,
+                missionLeaderIndex: nextLeaderIndex,
+                oberonSkillUsed: latestData.oberonSkillUsed || false,
+                oberonTarget: latestData.oberonTarget || null,
+            };
 
-    try {
-        await roomRef.update(nextUpdates);
-    } catch (err) {
-        console.error('推进下一轮失败:', err);
-        return;
-    }
+            try {
+                await roomRef.update(nextUpdates);
+            } catch (err) {
+                console.error('推进下一轮失败:', err);
+                return;
+            }
 
-    // ============================================================
-    // 10. 同步当前浏览器
-    // ============================================================
-    STATE._resultShown = false;
-    STATE.missionRound = nextRound;
-    STATE.missionTeam = [];
-    STATE.missionVotes = {};
-    STATE.missionTaskResults = {};
-    STATE.missionResult = null;
-    STATE.missionFinalized = false;
-    STATE.missionFinalizing = null;
-    STATE.missionAdvanceAt = null;
-    STATE.missionAdvanceClaim = null;
+            // ============================================================
+            // 10. 同步当前浏览器
+            // ============================================================
+            STATE._resultShown = false;
+            STATE.missionRound = nextRound;
+            STATE.missionTeam = [];
+            STATE.missionVotes = {};
+            STATE.missionTaskResults = {};
+            STATE.missionResult = null;
+            STATE.missionFinalized = false;
+            STATE.missionFinalizing = null;
+            STATE.missionAdvanceAt = null;
+            STATE.missionAdvanceClaim = null;
 
-    if (missionAdvanceTimer) {
-        clearTimeout(missionAdvanceTimer);
-        missionAdvanceTimer = null;
-    }
+            if (missionAdvanceTimer) {
+                clearTimeout(missionAdvanceTimer);
+                missionAdvanceTimer = null;
+            }
 
-    STATE.proposalRejectCount = 0;
-    STATE.missionOrder = nextMissionOrder;
-    STATE.missionLeaderIndex = nextLeaderIndex;
-    STATE.oberonTarget = latestData.oberonTarget || null;
+            STATE.proposalRejectCount = 0;
+            STATE.missionOrder = nextMissionOrder;
+            STATE.missionLeaderIndex = nextLeaderIndex;
+            STATE.oberonTarget = latestData.oberonTarget || null;
 
-    // ============================================================
-    // 11. 获取下一轮车长名称
-    // ============================================================
-    const nextLeaderUid = nextMissionOrder[nextLeaderIndex];
-    const nextLeaderName = nextLeaderUid
-        ? (latestData.players?.[nextLeaderUid]?.name || STATE.allPlayers?.[nextLeaderUid]?.name || '未知')
-        : '未知';
+            // ============================================================
+            // 11. 获取下一轮车长名称
+            // ============================================================
+            const nextLeaderUid = nextMissionOrder[nextLeaderIndex];
+            const nextLeaderName = nextLeaderUid
+                ? (latestData.players?.[nextLeaderUid]?.name || STATE.allPlayers?.[nextLeaderUid]?.name || '未知')
+                : '未知';
 
-    showToast(`第 ${nextRound} 轮任务开始，车长：${nextLeaderName}`, 2000);
+            showToast(`第 ${nextRound} 轮任务开始，车长：${nextLeaderName}`, 2000);
 
-    // ============================================================
-    // 12. 重新渲染
-    // ============================================================
-    renderDayMission();
-}
+            // ============================================================
+            // 12. 重新渲染
+            // ============================================================
+            renderDayMission();
+        }
 
         // ============================================================
         // 根据 Firebase 中的 missionAdvanceAt
@@ -5361,45 +5361,45 @@ ${STATE.proposalRejectCount >= 4
             });
 
             // ---------- 组队选择 ----------
-if (missionPhase === 'selecting') {
-    const effectiveUid = getEffectiveUid();
-    const currentLeaderUid = STATE.missionOrder && STATE.missionOrder.length > 0 ? STATE.missionOrder[STATE.missionLeaderIndex] : null;
-    const isLeader = (effectiveUid === currentLeaderUid);
+            if (missionPhase === 'selecting') {
+                const effectiveUid = getEffectiveUid();
+                const currentLeaderUid = STATE.missionOrder && STATE.missionOrder.length > 0 ? STATE.missionOrder[STATE.missionLeaderIndex] : null;
+                const isLeader = (effectiveUid === currentLeaderUid);
 
-    // 获取当前网格
-    const existingGrid = document.getElementById('missionSelectGrid');
-    const lastLeader = STATE._lastSelectingLeaderUid || null;
+                // 获取当前网格
+                const existingGrid = document.getElementById('missionSelectGrid');
+                const lastLeader = STATE._lastSelectingLeaderUid || null;
 
-    // 如果网格存在且车长未变（轮次相同），则只更新卡片样式，不重建
-    if (existingGrid && currentLeaderUid === lastLeader) {
-        const currentTeam = STATE.missionTeam || [];
-        const cards = existingGrid.querySelectorAll('.player-card');
-        cards.forEach(card => {
-            const uid = card.dataset.uid;
-            const isSelected = currentTeam.includes(uid);
-            card.style.borderColor = isSelected ? '#f0a500' : '#2a3a5a';
-            const mark = card.querySelector('.card-mark');
-            if (mark) mark.textContent = isSelected ? '✅' : '';
-        });
+                // 如果网格存在且车长未变（轮次相同），则只更新卡片样式，不重建
+                if (existingGrid && currentLeaderUid === lastLeader) {
+                    const currentTeam = STATE.missionTeam || [];
+                    const cards = existingGrid.querySelectorAll('.player-card');
+                    cards.forEach(card => {
+                        const uid = card.dataset.uid;
+                        const isSelected = currentTeam.includes(uid);
+                        card.style.borderColor = isSelected ? '#f0a500' : '#2a3a5a';
+                        const mark = card.querySelector('.card-mark');
+                        if (mark) mark.textContent = isSelected ? '✅' : '';
+                    });
 
-        // 更新进度信息
-        const config = getMissionConfig(STATE.missionRound);
-        if (config) {
-            const progressSpan = document.querySelector('#teamProgress .team-count');
-            if (progressSpan) {
-                progressSpan.textContent = `${currentTeam.length} / ${config.players}`;
-            }
-            const confirmBtn = document.getElementById('confirmTeamBtn');
-            if (confirmBtn) {
-                confirmBtn.disabled = (currentTeam.length !== config.players);
-            }
-        }
-        updateViewIndicators();
-        return; // 直接返回，不重建
-    }
+                    // 更新进度信息
+                    const config = getMissionConfig(STATE.missionRound);
+                    if (config) {
+                        const progressSpan = document.querySelector('#teamProgress .team-count');
+                        if (progressSpan) {
+                            progressSpan.textContent = `${currentTeam.length} / ${config.players}`;
+                        }
+                        const confirmBtn = document.getElementById('confirmTeamBtn');
+                        if (confirmBtn) {
+                            confirmBtn.disabled = (currentTeam.length !== config.players);
+                        }
+                    }
+                    updateViewIndicators();
+                    return; // 直接返回，不重建
+                }
 
-    // 记录当前车长，用于后续比较
-    STATE._lastSelectingLeaderUid = currentLeaderUid;
+                // 记录当前车长，用于后续比较
+                STATE._lastSelectingLeaderUid = currentLeaderUid;
 
                 let teamHtml = '';
                 // 始终显示发车顺序
@@ -5423,12 +5423,12 @@ if (missionPhase === 'selecting') {
 
                     // ✅ 首次渲染（或没有网格时），完整生成
                     teamHtml = orderHtml;
-					// ✅ 只有首轮车长才能看到切换方向按钮
-					if (STATE.missionRound === 1) {
-					teamHtml += `<div style="margin-bottom:10px;">
+                    // ✅ 只有首轮车长才能看到切换方向按钮
+                    if (STATE.missionRound === 1) {
+                        teamHtml += `<div style="margin-bottom:10px;">
 					<button class="btn btn-sm btn-secondary" onclick="toggleDirection()" style="padding:6px 16px;">🔄 切换方向</button>
 					</div>`;
-				}
+                    }
                     // 显示已选人数进度（带 id 方便更新）
                     teamHtml += `<div style="display:flex;justify-content:space-between;align-items:center;background:#1a2744;padding:8px 16px;border-radius:12px;margin-bottom:12px;" id="teamProgress">
             <span style="color:#8899aa;">👥 已选队员：</span>
@@ -5987,15 +5987,15 @@ if (missionPhase === 'selecting') {
                     : '好人';
             const roomRef = db.ref('rooms/' + STATE.roomId);
             roomRef.update({
-				// 骑士本人查验记录
-				['players/' + currentUid + '/knightChecked']:
-					true,
-				// 查验目标
-				['players/' + currentUid + '/knightTarget']:
-					targetUid,
-				// 查验结果
-				['players/' + currentUid + '/knightResult']:
-					result
+                // 骑士本人查验记录
+                ['players/' + currentUid + '/knightChecked']:
+                    true,
+                // 查验目标
+                ['players/' + currentUid + '/knightTarget']:
+                    targetUid,
+                // 查验结果
+                ['players/' + currentUid + '/knightResult']:
+                    result
             }).then(() => {
                 showToast(
                     `查验结果：${targetPlayer.name} 是 ${result} 阵营`,
@@ -6035,9 +6035,9 @@ if (missionPhase === 'selecting') {
             }
             const roomRef = db.ref('rooms/' + STATE.roomId);
             roomRef.update({
-				// 只保存给守卫本人看的保护目标
-				['players/' + currentUid + '/guardTarget']:
-					targetUid
+                // 只保存给守卫本人看的保护目标
+                ['players/' + currentUid + '/guardTarget']:
+                    targetUid
             }).then(() => {
                 showToast(
                     `🛡️ 已守护 ${targetPlayer.name}，本局无法更换目标`,
@@ -6500,26 +6500,26 @@ if (missionPhase === 'selecting') {
             const roomId = generateRoomId();
             const uid = isAdmin ? getAdminUid() : getPlayerUid(playerName);
             const roomRef = db.ref('rooms/' + roomId);
-const playerData = {
-    name:
-        playerName,
-    isHost:
-        true,
-    isReady:
-        false,
-    role:
-        null,
-    hasConfirmedNight:
-        false,
-    joinedAt:
-        Date.now(),
-    isVirtual:
-        false,
-    deviceId:
-        getDeviceId(),
-    online:
-        true
-};
+            const playerData = {
+                name:
+                    playerName,
+                isHost:
+                    true,
+                isReady:
+                    false,
+                role:
+                    null,
+                hasConfirmedNight:
+                    false,
+                joinedAt:
+                    Date.now(),
+                isVirtual:
+                    false,
+                deviceId:
+                    getDeviceId(),
+                online:
+                    true
+            };
             return roomRef.set({
                 host: uid,
                 players: { [uid]: playerData },
@@ -6688,188 +6688,188 @@ const playerData = {
             });
         }
 
-function joinRoom(roomId, playerName, uid = null) {
-    const roomRef =
-        db.ref('rooms/' + roomId);
-    return roomRef.once('value')
-        .then(snapshot => {
-            const data = snapshot.val();
-            if (!data) {
-                return {
-                    success:false,
-                    error:'房间不存在'
-                };
-            }
-            if (data.gameStarted) {
-                return {
-                    success:false,
-                    error:'游戏已开始，无法加入'
-                };
-            }
-            const players =
-                data.players || {};
-            const deviceId =
-                getDeviceId();
-            let targetUid = null;
-            // =====================================================
-            // 1. 优先恢复当前玩家 UID
-            //
-            // 只允许：
-            // - 本浏览器自己保存过的 UID
-            // - 明确传入的 UID
-            //
-            // 不再通过名字寻找玩家
-            // =====================================================
-            if (uid && players[uid]) {
-                targetUid = uid;
-            }
-            else {
-                const savedUid =
-                    sessionStorage.getItem(
-                        'avalon_player_uid'
-                    );
-                if (
-                    savedUid &&
-                    players[savedUid]
-                ) {
-                    targetUid =
-                        savedUid;
-                }
-            }
-            // =====================================================
-            // 2. 已存在玩家，恢复身份
-            // =====================================================
-            if (targetUid) {
-                const updates = {
-                    ['players/' + targetUid + '/name']:
-                        playerName,
-                    ['players/' + targetUid + '/deviceId']:
-                        deviceId,
-                    ['players/' + targetUid + '/online']:
-                        true
-                };
-                STATE.myUid =
-                    targetUid;
-                STATE.isHost =
-                    players[targetUid].isHost ||
-                    false;
-                STATE.allPlayers =
-                    {
-                        ...players
-                    };
-                localStorage.setItem(
-                    'avalon_room_id',
-                    roomId
-                );
-                localStorage.setItem(
-                    'avalon_player_name',
-                    playerName
-                );
-                sessionStorage.setItem(
-                    'avalon_player_uid',
-                    targetUid
-                );
-                const onlineRef =
-                    db.ref(
-                        'rooms/' +
-                        roomId +
-                        '/players/' +
-                        targetUid +
-                        '/online'
-                    );
-                onlineRef
-                    .onDisconnect()
-                    .set(false);
-                return roomRef.update(updates)
-                    .then(() => {
+        function joinRoom(roomId, playerName, uid = null) {
+            const roomRef =
+                db.ref('rooms/' + roomId);
+            return roomRef.once('value')
+                .then(snapshot => {
+                    const data = snapshot.val();
+                    if (!data) {
                         return {
-                            success:true,
-                            existing:true
+                            success: false,
+                            error: '房间不存在'
                         };
-                    });
-            }
-            // =====================================================
-            // 3. 新玩家
-            //
-            // 永远生成新的 UID
-            // 不看名字
-            // 不看设备ID
-            // =====================================================
-            const newUid =
-                uid ||
-                getPlayerUid(playerName);
-            const playerData = {
-                name:
-                    playerName,
-                isHost:
-                    false,
-                isReady:
-                    false,
-                role:
-                    null,
-                hasConfirmedNight:
-                    false,
-                joinedAt:
-                    Date.now(),
-                isVirtual:
-                    false,
-                deviceId:
-                    deviceId,
-                online:
-                    true
-            };
-            const updates = {
-                ['players/' + newUid]:
-                    playerData
-            };
-            STATE.myUid =
-                newUid;
-            STATE.isHost =
-                false;
-            STATE.allPlayers =
-                {
-                    ...players,
-                    [newUid]:
-                        playerData
-                };
-            localStorage.setItem(
-                'avalon_room_id',
-                roomId
-            );
-            localStorage.setItem(
-                'avalon_player_name',
-                playerName
-            );
-            sessionStorage.setItem(
-                'avalon_player_uid',
-                newUid
-            );
-            const onlineRef =
-                db.ref(
-                    'rooms/' +
-                    roomId +
-                    '/players/' +
-                    newUid +
-                    '/online'
-                );
-            onlineRef
-                .onDisconnect()
-                .set(false);
-            return roomRef.update(updates)
-                .then(() => {
+                    }
+                    if (data.gameStarted) {
+                        return {
+                            success: false,
+                            error: '游戏已开始，无法加入'
+                        };
+                    }
+                    const players =
+                        data.players || {};
+                    const deviceId =
+                        getDeviceId();
+                    let targetUid = null;
+                    // =====================================================
+                    // 1. 优先恢复当前玩家 UID
+                    //
+                    // 只允许：
+                    // - 本浏览器自己保存过的 UID
+                    // - 明确传入的 UID
+                    //
+                    // 不再通过名字寻找玩家
+                    // =====================================================
+                    if (uid && players[uid]) {
+                        targetUid = uid;
+                    }
+                    else {
+                        const savedUid =
+                            sessionStorage.getItem(
+                                'avalon_player_uid'
+                            );
+                        if (
+                            savedUid &&
+                            players[savedUid]
+                        ) {
+                            targetUid =
+                                savedUid;
+                        }
+                    }
+                    // =====================================================
+                    // 2. 已存在玩家，恢复身份
+                    // =====================================================
+                    if (targetUid) {
+                        const updates = {
+                            ['players/' + targetUid + '/name']:
+                                playerName,
+                            ['players/' + targetUid + '/deviceId']:
+                                deviceId,
+                            ['players/' + targetUid + '/online']:
+                                true
+                        };
+                        STATE.myUid =
+                            targetUid;
+                        STATE.isHost =
+                            players[targetUid].isHost ||
+                            false;
+                        STATE.allPlayers =
+                        {
+                            ...players
+                        };
+                        localStorage.setItem(
+                            'avalon_room_id',
+                            roomId
+                        );
+                        localStorage.setItem(
+                            'avalon_player_name',
+                            playerName
+                        );
+                        sessionStorage.setItem(
+                            'avalon_player_uid',
+                            targetUid
+                        );
+                        const onlineRef =
+                            db.ref(
+                                'rooms/' +
+                                roomId +
+                                '/players/' +
+                                targetUid +
+                                '/online'
+                            );
+                        onlineRef
+                            .onDisconnect()
+                            .set(false);
+                        return roomRef.update(updates)
+                            .then(() => {
+                                return {
+                                    success: true,
+                                    existing: true
+                                };
+                            });
+                    }
+                    // =====================================================
+                    // 3. 新玩家
+                    //
+                    // 永远生成新的 UID
+                    // 不看名字
+                    // 不看设备ID
+                    // =====================================================
+                    const newUid =
+                        uid ||
+                        getPlayerUid(playerName);
+                    const playerData = {
+                        name:
+                            playerName,
+                        isHost:
+                            false,
+                        isReady:
+                            false,
+                        role:
+                            null,
+                        hasConfirmedNight:
+                            false,
+                        joinedAt:
+                            Date.now(),
+                        isVirtual:
+                            false,
+                        deviceId:
+                            deviceId,
+                        online:
+                            true
+                    };
+                    const updates = {
+                        ['players/' + newUid]:
+                            playerData
+                    };
+                    STATE.myUid =
+                        newUid;
+                    STATE.isHost =
+                        false;
+                    STATE.allPlayers =
+                    {
+                        ...players,
+                        [newUid]:
+                            playerData
+                    };
+                    localStorage.setItem(
+                        'avalon_room_id',
+                        roomId
+                    );
+                    localStorage.setItem(
+                        'avalon_player_name',
+                        playerName
+                    );
+                    sessionStorage.setItem(
+                        'avalon_player_uid',
+                        newUid
+                    );
+                    const onlineRef =
+                        db.ref(
+                            'rooms/' +
+                            roomId +
+                            '/players/' +
+                            newUid +
+                            '/online'
+                        );
+                    onlineRef
+                        .onDisconnect()
+                        .set(false);
+                    return roomRef.update(updates)
+                        .then(() => {
+                            return {
+                                success: true,
+                                existing: false
+                            };
+                        });
+                })
+                .catch(err => {
                     return {
-                        success:true,
-                        existing:false
+                        success: false,
+                        error: err.message
                     };
                 });
-        })
-        .catch(err => {
-            return {
-                success:false,
-                error:err.message
-            };
-        });
-}
+        }
 
         // ----- 核心监听 -----
         function listenRoom(roomId) {
@@ -7710,9 +7710,9 @@ function joinRoom(roomId, playerName, uid = null) {
                     console.error('leaveRoom 错误:', err);
                 });
             } else {
-				// 无房间状态，仅清除当前房间数据
-				// 保留设备身份和玩家UID，避免生成新的玩家身份
-				localStorage.removeItem('avalon_room_id');
+                // 无房间状态，仅清除当前房间数据
+                // 保留设备身份和玩家UID，避免生成新的玩家身份
+                localStorage.removeItem('avalon_room_id');
                 // 保留玩家名字
                 STATE.roomId = null; STATE.myUid = null; STATE.isHost = false; STATE.allPlayers = {}; STATE.roomExists = false;
                 showEnterPage();

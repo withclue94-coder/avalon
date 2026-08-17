@@ -1909,6 +1909,7 @@
             <!-- ===== 骑士/守卫 操作区域（新增） ===== -->
             <div id="knightAction" class="hidden"
                 style="margin-top:12px;padding:12px;background:#1a2744;border-radius:12px;"></div>
+            <div id="assassinAction" class="hidden"></div>
             <div id="guardAction" class="hidden"
                 style="margin-top:12px;padding:12px;background:#1a2744;border-radius:12px;"></div>
 
@@ -1995,8 +1996,10 @@
             playerNumbers: {},        // { uid: 数字 }
             showResultTimer: null,    // 用于延迟进入下一轮
             // ----- 刺杀相关 -----
-            assassinUid: null,            // 刺客的 UID
+            assassinUid: null,
+            assassinSnipeTarget: null,            // 刺客的 UID
             assassinationTarget: null,    // 刺客选择的目标 UID
+            assassinSnipeTarget: null, // 刺客天黑阶段狙击目标
             assassinationDone: false,     // 是否已完成刺杀
             assassinationSelectedTarget: null, // 刺客当前选中的目标（用于二次确认）
             assassinationInfo: null,
@@ -2028,13 +2031,13 @@
             '梅林': '好人阵营 · 你能看到除<span style="color:#f0a500;">莫德雷德</span>外的所有坏人',
             '派西维尔': '好人阵营 · 你能看到<span style="color:#f0a500;">梅林</span>和<span style="color:#f0a500;">莫甘娜</span>，请你自行判断两人身份',
             '莫甘娜': '坏人阵营 · 你可以伪装成<span style="color:#f0a500;">梅林</span>，<span style="color:#f0a500;">派西维尔</span>可以看到你和<span style="color:#f0a500;">梅林</span>',
-            '刺客': '坏人阵营 · 在好人任务成功后，你可以刺杀<span style="color:#f0a500;">梅林</span>',
+            '刺客': '坏人阵营 · 好人任务成功后，你可以选择一名玩家刺杀，若被刺杀玩家为<span style="color:#f0a500;">梅林</span>，则坏人胜利',
             '莫德雷德': '坏人阵营 · <span style="color:#f0a500;">梅林</span>无法看到你',
             '奥伯伦': '坏人阵营 · 孤狼，你看不到任何同伴，同伴也看不到你',
             '忠臣': '好人阵营 · 你没有特殊能力，请尽量完成任务并帮助<span style="color:#f0a500;">梅林</span>隐藏身份',
             '爪牙': '坏人阵营 · 你是普通的坏人，没有特殊能力，和其他坏人互相认识',
             '骑士': '好人阵营 · 你可以查验一名玩家的所属阵营，注意：<span style="color:#f0a500;">莫德雷德</span>也会显示为好人',
-            '守卫': '好人阵营 · 你可以选择一名玩家守护，被守护的玩家若为<span style="color:#f0a500;">梅林</span>，无法被<span style="color:#f0a500;">刺客</span>刺杀，最终好人将胜利',
+            '守卫': '好人阵营 · 你可以选择一名玩家守护，被守护的玩家若为<span style="color:#f0a500;">梅林</span>，无法被<span style="color:#f0a500;">刺客</span>刺杀。注意：如果被<span style="color:#f0a500;">刺客</span>天黑阶段狙击，守卫技能会失效。',
             '倒影': '好人阵营 · 你知道<span style="color:#f0a500;">梅林</span>是谁，但在<span style="color:#f0a500;">梅林</span>眼中你是坏人，请你尽量保护<span style="color:#f0a500;">梅林</span>身份',
         };
 
@@ -2398,7 +2401,30 @@
         <div style="color:#eee;font-weight:500;">${companions.length ? companions.join('、') : '无'}</div>
     </div>`;
                 if (isCustom) {
-                    infoHtml += `<div style="margin-top:6px;color:#8899aa;font-size:13px;">⚠️ 如果<span style="color:#f0a500;">守卫</span>守护到<span style="color:#f0a500;">梅林</span>，你的刺杀将会失效</div>`;
+                    infoHtml += `<div style="margin-top:6px;color:#8899aa;font-size:13px;">⚠️ 如果<span style="color:#f0a500;">守卫</span>守护到<span style="color:#f0a500;">梅林</span>且未被你在天黑阶段狙击，你的刺杀将会失效</div>`;
+                    // 自定义板子：刺客增加显示狙击信息
+                    const snipeTarget = effectivePlayer.assassinSnipeTarget;
+                    if (snipeTarget && allPlayers[snipeTarget]) {
+                        infoHtml += `
+        <div style="margin-top:8px;padding:10px;background:#1a2744;border-radius:8px;">
+            <div style="color:#8899aa;">
+                🗡️ 天黑阶段狙击目标
+            </div>
+            <div style="color:#eee;font-weight:500;">
+                ${escapeHtml(allPlayers[snipeTarget].name)}
+            </div>
+        </div>`;
+                    } else {
+                        infoHtml += `
+        <div style="margin-top:8px;padding:10px;background:#1a2744;border-radius:8px;">
+            <div style="color:#8899aa;">
+                🗡️ 天黑阶段狙击目标
+            </div>
+            <div style="color:#8899aa;">
+                尚未选择
+            </div>
+        </div>`;
+                    }
                 }
             }
 
@@ -2550,7 +2576,7 @@
 			<div style="color:#8899aa;">🛡️ 守卫能力</div>
 			<div style="color:#eee;font-weight:500;">
 				天黑时，你可以选择一名玩家守护，
-				若守护到<span style="color:#f0a500;">梅林</span>，
+				若守护到<span style="color:#f0a500;">梅林</span>，且你未被狙击
 				<span style="color:#f0a500;">梅林</span>被刺杀时也是好人胜利。
 			</div>
 		</div>`;
@@ -2566,7 +2592,7 @@
 					🛡️ 你守护了：${escapeHtml(guardName)}
 				</div>
 				<div style="color:#667788;font-size:12px;">
-					若该玩家是<span style="color:#f0a500;">梅林</span>，
+					若该玩家是<span style="color:#f0a500;">梅林</span>且你没有被<span style="color:#f0a500;">刺客</span>狙击，
 					被刺杀时好人将胜利
 				</div>
 			</div>`;
@@ -3285,7 +3311,7 @@
                 shuffleArray(companions);  // ✅ 新增：随机打乱顺序
                 infoHtml = '<div class="info-label">👥 你的坏人同伴</div><div class="info-value">' + (companions.length ? companions.join('、') : '无') + '</div>';
                 if (isCustom) {
-                    infoHtml += '<div style="margin-top:6px;color:#8899aa;font-size:13px;">⚠️ 如果<span style="color:#f0a500;">守卫</span>守护到<span style="color:#f0a500;">梅林</span>，你的刺杀将会失效</div>';
+                    infoHtml += '<div style="margin-top:6px;color:#8899aa;font-size:13px;">⚠️ 如果<span style="color:#f0a500;">守卫</span>守护到<span style="color:#f0a500;">梅林</span>且未被你在天黑阶段狙击，你的刺杀将会失效</div>';
                 }
             }
 
@@ -3326,7 +3352,7 @@
                 infoHtml = '<div class="info-label">⚔️ 骑士能力</div><div class="info-value">天黑时，你可以选择查验一名玩家的阵营（<span style="color:#f0a500;">莫德雷德</span>显示为好人）。</div>';
             }
             else if (role === '守卫') {
-                infoHtml = '<div class="info-label">🛡️ 守卫能力</div><div class="info-value">天黑时，你可以选择一名玩家守护，若守护到<span style="color:#f0a500;">梅林</span>，<span style="color:#f0a500;">刺客</span>无法成功刺杀，则好人胜利。</div>';
+                infoHtml = '<div class="info-label">🛡️ 守卫能力</div><div class="info-value">天黑时，你可以选择一名玩家守护，若守护到<span style="color:#f0a500;">梅林</span>，且<span style="color:#f0a500;">刺客</span>未狙击你，则无法成功刺杀，好人胜利。</div>';
             }
             else {
                 // 忠臣
@@ -3338,8 +3364,10 @@
             // 3. 处理骑士和守卫的操作界面（与原有逻辑整合）
             const knightAction = document.getElementById('knightAction');
             const guardAction = document.getElementById('guardAction');
+            const assassinAction = document.getElementById('assassinAction');
             if (knightAction) knightAction.innerHTML = '';
             if (guardAction) guardAction.innerHTML = '';
+            if (assassinAction) assassinAction.innerHTML = '';
 
             // 只有自定义板子且角色匹配时才显示操作
             if (isCustom) {
@@ -3382,6 +3410,20 @@
                 } else if (guardAction) {
                     guardAction.classList.add('hidden');
                 }
+
+                if (role === '刺客' && !player.assassinSnipeTarget) {
+                    let html = '<p>🗡️ 选择一名未知身份玩家进行狙击：无法选择自己和已知坏人。若目标为<span style="color:#f0a500;">守卫</span>，则<span style="color:#f0a500;">守卫</span>技能失效。</p><div class="player-grid">';
+                    playerIds.forEach(uid => {
+                        if (uid === currentUid) return;
+                        const p = players[uid];
+                        // 刺客只能排除自己和已知坏人，奥伯伦属于孤狼坏人，不在已知列表中
+                        if (['莫甘娜', '莫德雷德', '爪牙'].includes(p.role)) return;
+                        const remoteUrl = getAvatarUrl(p.name, p.name);
+                        html += `<div class="player-card" style="cursor:pointer;" onclick="assassinSnipe('${uid}')"><span class="avatar"><img src="${remoteUrl}"></span><span class="name">${escapeHtml(p.name)}</span></div>`;
+                    });
+                    html += '</div>';
+                    if (assassinAction) { assassinAction.innerHTML = html; assassinAction.classList.remove('hidden'); }
+                } else if (assassinAction) assassinAction.classList.add('hidden');
             } else {
                 // 默认板子下隐藏操作区域
                 if (knightAction) knightAction.classList.add('hidden');
@@ -3781,6 +3823,21 @@
             });
         };
 
+        window.assassinSnipe = function (targetUid) {
+            const uid = getEffectiveUid();
+            if (!STATE.roomId) return;
+            const p = STATE.allPlayers[uid];
+            if (!p || p.role !== '刺客') return showToast('你不是刺客', 1500);
+            const target = STATE.allPlayers[targetUid];
+            if (!target || targetUid === uid) return showToast('目标无效', 1500);
+            // 刺客只能排除自己和已知坏人，奥伯伦不在已知坏人列表中
+            if (['莫甘娜', '莫德雷德', '爪牙'].includes(target.role)) {
+                return showToast('不能选择已知坏人', 1500);
+            }
+            db.ref('rooms/' + STATE.roomId + '/players/' + uid + '/assassinSnipeTarget').set(targetUid)
+                .then(() => { showToast('🗡️ 狙击目标已选择', 1500); });
+        };
+
         window.assassinate = function (targetUid) {
             if (!STATE.roomId) return;
             if (STATE.assassinationDone) return showToast('刺杀已完成', 1500);
@@ -3794,11 +3851,13 @@
             const guardPlayer = Object.values(STATE.allPlayers)
                 .find(p => p.role === '守卫');
 
-            const guardTarget = guardPlayer
-                ? guardPlayer.guardTarget
-                : null;
+            const guardTarget = guardPlayer ? guardPlayer.guardTarget : null;
+            const assassinPlayer = Object.values(STATE.allPlayers).find(p => p.role === '刺客');
+            const assassinSnipeTarget = assassinPlayer ? assassinPlayer.assassinSnipeTarget : null;
+            const guardUid = guardPlayer ? Object.keys(STATE.allPlayers).find(uid => STATE.allPlayers[uid] === guardPlayer) : null;
+            const isGuardDisabled = assassinSnipeTarget && guardUid === assassinSnipeTarget;
 
-            if (isMerlin && guardTarget === targetUid) {
+            if (isMerlin && guardTarget === targetUid && !isGuardDisabled) {
                 // 守卫成功守护梅林
                 const roomRef = db.ref('rooms/' + STATE.roomId);
                 roomRef.update({
@@ -6560,6 +6619,7 @@ ${STATE.proposalRejectCount >= 4
                 round: 1,
                 // 刺客字段
                 assassinUid: null,
+                assassinSnipeTarget: null,
                 assassinationTarget: null,
                 assassinationDone: false,
                 // 结算
@@ -6642,6 +6702,7 @@ ${STATE.proposalRejectCount >= 4
                     round: 1,
                     // 刺客字段
                     assassinUid: null,
+                    assassinSnipeTarget: null,
                     assassinationTarget: null,
                     assassinationDone: false,
                     // 结算

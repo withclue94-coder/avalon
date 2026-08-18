@@ -3908,7 +3908,6 @@
         // missionFinalized：表示本轮任务是否已经完成最终结算。
         // missionFinalizing：表示当前是否有客户端正在处理结算。
         async function finalizeMissionResult(taskFailed) {
-            let finalOberonTarget = null;
             if (!STATE.roomId) return;
             // ✅ 如果已经最终结算，直接返回（避免重复）
             if (STATE.missionFinalized && STATE.missionResult !== null) {
@@ -4195,10 +4194,11 @@
                 showToast(
                     '任务结算失败：' + err.message, 2500
                 );
-                await releaseFinalizingLock();
+
                 STATE._resultShown = false;
                 STATE.missionFinalizing = null;
-            }
+                return;
+            } finally { await releaseFinalizingLock(); }
         }
 
         // 尝试推进到下一轮任务
@@ -6028,7 +6028,9 @@
                     return;
                 }
                 // ----- 自动清理断线玩家（仅管理员房主执行） -----
-                autoCleanupDisconnectedPlayers(data, roomRef);
+                if (!data.gameStarted) {
+                    autoCleanupDisconnectedPlayers(data, roomRef);
+                }
                 // ----- 同步 STATE 数据 -----
                 syncStateFromData(data);
                 // ----- 任务结果展示倒计时 -----
@@ -7270,13 +7272,13 @@
         // 模块 15：注入白天页面与选举页面
         // ============================================================
 
-function injectDayMissionPage() {
-    if (document.getElementById('dayMissionPage')) return;
-    const app = document.getElementById('app');
-    const div = document.createElement('div');
-    div.id = 'dayMissionPage';
-    div.className = 'hidden';
-    div.innerHTML = `<h1>⚔️ 任务阶段</h1>
+        function injectDayMissionPage() {
+            if (document.getElementById('dayMissionPage')) return;
+            const app = document.getElementById('app');
+            const div = document.createElement('div');
+            div.id = 'dayMissionPage';
+            div.className = 'hidden';
+            div.innerHTML = `<h1>⚔️ 任务阶段</h1>
         <p class="subtitle" id="dayMissionSubtitle">第 1 轮任务</p>
         <div id="viewIndicator5" class="hidden" style="display:flex;justify-content:center;margin-bottom:12px;">
             <div class="view-indicator">
@@ -7308,19 +7310,19 @@ function injectDayMissionPage() {
             <button class="btn btn-sm" id="dayMissionLogoutBtn">退出房间</button>
             <button class="identity-btn" style="background:#f0a500;color:#1a1a2e;border:none;border-radius:20px;padding:8px 20px;font-size:15px;cursor:pointer;font-weight:600;">🆔 我的身份</button>
         </div>`;
-    app.appendChild(div);
-    dayMissionPage = document.getElementById('dayMissionPage');
-    Object.assign(window, {
-        dayMissionPage: div,
-        dayMissionSubtitle: document.getElementById('dayMissionSubtitle'),
-        dayMissionInfo: document.getElementById('dayMissionInfo'),
-        dayMissionTeam: document.getElementById('dayMissionTeam'),
-        dayMissionVotes: document.getElementById('dayMissionVotes'),
-        dayMissionResult: document.getElementById('dayMissionResult'),
-        dayMissionAction: document.getElementById('dayMissionAction')
-    });
-    document.getElementById('dayMissionLogoutBtn')?.addEventListener('click', handleLeave);
-}
+            app.appendChild(div);
+            dayMissionPage = document.getElementById('dayMissionPage');
+            Object.assign(window, {
+                dayMissionPage: div,
+                dayMissionSubtitle: document.getElementById('dayMissionSubtitle'),
+                dayMissionInfo: document.getElementById('dayMissionInfo'),
+                dayMissionTeam: document.getElementById('dayMissionTeam'),
+                dayMissionVotes: document.getElementById('dayMissionVotes'),
+                dayMissionResult: document.getElementById('dayMissionResult'),
+                dayMissionAction: document.getElementById('dayMissionAction')
+            });
+            document.getElementById('dayMissionLogoutBtn')?.addEventListener('click', handleLeave);
+        }
 
         function injectElectLeaderPage() {
             if (document.getElementById('electLeaderPage')) return;
@@ -7480,5 +7482,5 @@ function injectDayMissionPage() {
         });
         // 强制隐藏管理员按钮（每次刷新默认隐藏）
         adminToggleBtn.classList.remove('visible');
-        
+
     </script>
